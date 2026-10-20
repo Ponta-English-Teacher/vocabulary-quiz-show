@@ -1,5 +1,6 @@
 import { handleStudioRequest, resolveMode } from "@/lib/studio/ai/service";
 import { DEFAULT_MODEL } from "@/lib/studio/ai/openai";
+import { requireTeacher } from "@/lib/teacher/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // OpenAI usage costs money: teacher passcode required (see lib/teacher/auth.ts).
+  const denied = await requireTeacher(request);
+  if (denied) return denied;
   const text = await request.text();
   if (text.length > MAX_BODY_CHARS) {
     return Response.json({ ok: false, mode: "mock", error: { code: "bad_request", message: "Request too large." } }, { status: 413 });

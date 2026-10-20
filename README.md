@@ -40,18 +40,21 @@ Open the app → **Teacher Studio** (welcome screen). Talk to the AI producer, g
 
 
 ## Phase 3 — Two-phone classroom mode
-**Teacher:** welcome screen → pick the word set → **Host for a class (two phones)** → share the link (it uses the laptop's Wi-Fi address). **Students:** open the link on their phones, enter name + group number (same number = same pair, max two players).
+**Teacher:** welcome screen → pick the word set → **Host for a class (two phones)** → share the QR code or link. **Students:** scan/open it on their phones, enter a name and a group number (same number = same pair, max two players).
 
-Run for a class (single process, same Wi-Fi):
-```
-npm run build && npm run start:lan -- -p 3200     # then open http://<laptop-ip>:3200
-```
-- Authoritative state lives **in the server's memory** (`src/lib/class/store.ts`), reached by short polling (`/api/class/...`). Restarting the server ends all games and invalidates links.
-- Rooms are keyed by `activityId + group`; seats are claimed with a random per-phone token (kept in that phone's localStorage, sent in an `Authorization` header). The token — never the URL — decides seat and role.
-- The Taker's responses never contain the word, definition, example, accepted answers or hints; the Giver only gets the word currently in play (`src/lib/class/views.ts`).
-- **Not suitable for Vercel serverless** (instances don't share memory). A public HTTPS link needs a long-running Node host, or an external shared store.
-- Demo mode (`/`) is unchanged.
+- **State lives in shared storage, not in the server process** (`src/lib/class/service.ts`). On Vercel that is Upstash Redis (REST, plain `fetch`); locally, with no Upstash variables, an in-memory store is used. Every request is self-contained, so any serverless instance can serve any phone.
+- **Concurrency:** a change is read → applied by the pure rules (`engine.ts`) → written with an atomic version check; if another request got there first it is re-applied to the fresh state. Duplicate submissions are ignored (per-request ids).
+- **Security:** the seat (and so the role) comes from a random per-phone token (only its hash is stored), never from the URL. The Taker's responses never contain the word, definition, example, accepted answers or hints; the Giver only gets the current word; finished words keep only their name.
+- **Presence & cost:** each poll is 3 storage commands every 2.5 s (6 s when the tab is hidden). A 30-phone, 45-minute class is roughly 100K commands.
 
+## Teacher passcode
+`TEACHER_PASSCODE` protects the Teacher Studio (OpenAI usage) and class-link creation (`x-teacher-passcode` header, 10 wrong guesses per 10 minutes then locked out). On Vercel the teacher tools are **locked** if it is not set. Students never need it.
+
+## Deploying to Vercel
+1. Import the GitHub repo in Vercel (project name `vocabulary-quiz-show`).
+2. In the project: **Storage → Marketplace → Upstash Redis** (free plan), connect it to the project (adds the Redis variables).
+3. Add environment variables (Production): `TEACHER_PASSCODE` (required), `OPENAI_API_KEY` (optional, for live AI).
+4. Deploy. Open the production URL → **Teacher Studio / Host for a class** → enter the passcode → share the QR code.
 
 ## Voice: listening and speaking
 - **Hearing words and hints (Giver):** the browser's built-in speech synthesis (free, offline). `src/lib/speech.ts` ranks the device's voices (natural/enhanced and well-known clear English voices first, novelty voices never), reads "____" as "blank", and allows only ONE playback at a time — starting another stops the first, pressing the playing button again stops it. Hints can be played once revealed (unrevealed hints cost points, so they stay hidden).

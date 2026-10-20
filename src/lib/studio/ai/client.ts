@@ -1,4 +1,5 @@
 import type { VocabWord } from "@/data/vocab";
+import { clearPasscode, teacherHeaders } from "@/lib/teacher/client";
 import { parseGeneratedWords } from "../validation";
 import type { AiMode, StudioData, StudioRequest, StudioResponse } from "./types";
 
@@ -30,7 +31,7 @@ export async function callStudio<T extends StudioData["task"]>(
   const req = { task, ...params } as unknown as StudioRequest;
   let res: Response;
   try {
-    res = await fetch("/api/studio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });
+    res = await fetch("/api/studio", { method: "POST", headers: { "Content-Type": "application/json", ...teacherHeaders() }, body: JSON.stringify(req) });
   } catch {
     throw new StudioClientError("Couldn't reach the Studio server. Is the app running?");
   }
@@ -40,6 +41,7 @@ export async function callStudio<T extends StudioData["task"]>(
   } catch {
     throw new StudioClientError("The Studio server sent an unreadable response.");
   }
+  if (res.status === 401) clearPasscode();
   if (!body.ok) throw new StudioClientError(body.error.message);
   if (body.data.task !== task) throw new StudioClientError("Unexpected response from the Studio server.");
 

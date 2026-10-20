@@ -12,8 +12,10 @@ interface Stored {
 }
 
 const storageKey = (activityId: string) => `vqs.class.${activityId}`;
-const POLL_MS = 1200;
-const POLL_HIDDEN_MS = 3000;
+// Polling is the main running cost on shared storage, so it is deliberately gentle: results of the student's
+// OWN actions come back instantly in the action response; polling only has to notice the partner.
+const POLL_MS = 2500;
+const POLL_HIDDEN_MS = 6000;
 
 function readStored(activityId: string): Stored | null {
   try {
@@ -64,10 +66,12 @@ export function useClassSession(activityId: string) {
   const [busy, setBusy] = useState(false);
   const session = useRef<Stored | null>(null);
   const versionRef = useRef(0);
+  const partnerRef = useRef<"1" | "0" | "n">("n"); // what the screen last showed for the partner's connection
 
   const apply = useCallback((v: ClassView) => {
     if (v.version >= versionRef.current) {
       versionRef.current = v.version;
+      partnerRef.current = v.partner ? (v.partner.connected ? "1" : "0") : "n";
       setView(v);
     }
   }, []);
@@ -149,7 +153,7 @@ export function useClassSession(activityId: string) {
     const tick = async () => {
       const s = session.current;
       if (!s || stop) return;
-      const r = await request(`/api/class/${activityId}/state?group=${encodeURIComponent(s.group)}&since=${versionRef.current}`, {
+      const r = await request(`/api/class/${activityId}/state?group=${encodeURIComponent(s.group)}&since=${versionRef.current}&pc=${partnerRef.current}`, {
         headers: { Authorization: `Bearer ${s.token}` },
       });
       if (stop) return;

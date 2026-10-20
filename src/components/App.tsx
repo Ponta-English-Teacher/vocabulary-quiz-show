@@ -5,6 +5,7 @@ import { SAMPLE_SET, type VocabSet } from "@/data/vocab";
 import { Game } from "./Game";
 import { Stage } from "./Stage";
 import { Studio } from "./studio/Studio";
+import { TeacherGate } from "./TeacherGate";
 import { approvedSets, toVocabSet } from "@/lib/studio/ops";
 import { getBrowserStorage, loadActivities } from "@/lib/studio/storage";
 
@@ -31,6 +32,7 @@ export function App() {
 
   return screen === "studio" ? (
     <Stage tone="studio">
+      <TeacherGate onBack={() => { reload(); setGameKey((k) => k + 1); setScreen("game"); }}>
       <Studio
         onExit={() => { reload(); setGameKey((k) => k + 1); setScreen("game"); }}
         onPlay={(set) => {
@@ -41,6 +43,7 @@ export function App() {
           setScreen("game");
         }}
       />
+      </TeacherGate>
     </Stage>
   ) : (
     <Game

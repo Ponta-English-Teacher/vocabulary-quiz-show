@@ -1,5 +1,5 @@
 import { errorResponse, okResponse, readJson } from "@/lib/class/http";
-import { getClassStore } from "@/lib/class/store";
+import { getClassService } from "@/lib/class/service";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ activityId
   } catch {
     return errorResponse("bad_request", "Invalid request.");
   }
-  const r = getClassStore().join({ activityId, group: body?.group, name: body?.name, token: body?.token });
+  const r = await getClassService().join({ activityId, group: body?.group, name: body?.name, token: body?.token });
   if (!r.ok) return errorResponse(r.code, r.message);
   return okResponse({ token: r.token, seat: r.seat, rejoined: r.rejoined, view: r.view });
 }

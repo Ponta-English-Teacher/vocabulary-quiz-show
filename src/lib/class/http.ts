@@ -3,7 +3,7 @@ import type { ErrorCode } from "./types";
 
 const STATUS: Record<ErrorCode, number> = {
   no_activity: 404, no_room: 404, bad_group: 400, bad_name: 400, bad_request: 400,
-  full: 409, unauthorized: 401, forbidden: 403, bad_action: 400,
+  full: 409, unauthorized: 401, forbidden: 403, bad_action: 400, busy: 503, unavailable: 503,
 };
 
 export const errorResponse = (code: ErrorCode, message: string) =>
@@ -24,8 +24,9 @@ export async function readJson(request: Request, maxChars = 100_000): Promise<un
   return JSON.parse(text);
 }
 
-/** Phones need the laptop's Wi-Fi address, not "localhost". */
+/** Phones need the laptop's Wi-Fi address, not "localhost". Never meaningful (or safe to show) on Vercel. */
 export function lanAddresses(): string[] {
+  if (process.env.VERCEL) return [];
   const out: string[] = [];
   for (const list of Object.values(networkInterfaces())) {
     for (const i of list ?? []) if (i.family === "IPv4" && !i.internal) out.push(i.address);

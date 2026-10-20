@@ -574,6 +574,10 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .answer__box .btn--inline { padding-left: 0.8rem; padding-right: 0.8rem; }
 @keyframes mic-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgb(255 61 139 / 0.55); } 50% { box-shadow: 0 0 0 10px rgb(255 61 139 / 0); } }
 
+.qr { display: grid; justify-items: center; gap: 0.4rem; margin: 0.2rem 0; }
+.qr img, .qr__wait { background: #fff; padding: 8px; border-radius: 12px; display: block; }
+.qr figcaption { font: 700 0.8rem/1 var(--display); letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-dim); }
+
 /* ---- motion ------------------------------------------------------------ */
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes slam { from { opacity: 0; transform: scale(1.5); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
