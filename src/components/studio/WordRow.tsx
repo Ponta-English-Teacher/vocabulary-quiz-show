@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CEFR_LEVELS, PARTS_OF_SPEECH, type VocabWord } from "@/data/vocab";
-import { validateWord, type WordIssue } from "@/lib/studio/validation";
+import { coerceJa, LIMITS, validateWord, type WordIssue } from "@/lib/studio/validation";
 
 export interface WordRowProps {
   index: number;
@@ -42,7 +42,17 @@ export function WordRow(p: WordRowProps) {
   const working = p.busyWordId === w.id;
   const [instr, setInstr] = useState("");
   const [acceptText, setAcceptText] = useState((w.accept ?? []).join(", "));
+  const [jaText, setJaText] = useState((w.ja ?? []).join("、"));
+  const [phraseText, setPhraseText] = useState((w.giverInfo?.phrases ?? []).join("\n"));
   const panelId = `word-${w.id}`;
+
+  const commitJa = () => p.onEdit({ ja: coerceJa(jaText) });
+  const editInfo = (patch: Partial<NonNullable<VocabWord["giverInfo"]>>) => {
+    const next = { ...w.giverInfo, ...patch };
+    const empty = !next.looks?.trim() && !next.use?.trim() && !(next.phrases ?? []).some((x) => x.trim());
+    p.onEdit({ giverInfo: empty ? undefined : next });
+  };
+  const commitPhrases = () => editInfo({ phrases: phraseText.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, LIMITS.phrases) });
 
   const commitAccept = () => {
     const list = acceptText.split(/[,、]/).map((s) => s.trim()).filter(Boolean);
@@ -106,12 +116,13 @@ export function WordRow(p: WordRowProps) {
           </label>
 
           <fieldset className="hintset">
-            <legend>Spoken hints — from vague to strong</legend>
+            <legend>Hints — hint 1 is the free opening hint</legend>
+            <p className="note">Hint 1 is shown to <b>both players automatically</b> at the start of every round and costs nothing, so make it a real situation (who, when, where) — not just “it is a kitchen tool”. Hints 2 and 3 are optional and cost points.</p>
             {[0, 1, 2].map((i) => (
               <label className="fld fld--hint" key={i}>
                 <span className="hintset__n">{i + 1}</span>
                 <input
-                  aria-label={`Hint ${i + 1}`}
+                  aria-label={i === 0 ? "Hint 1 (opening hint, free)" : `Hint ${i + 1} (extra, costs points)`}
                   value={w.hints[i] ?? ""}
                   onChange={(e) => {
                     const hints = [...w.hints];
@@ -125,6 +136,53 @@ export function WordRow(p: WordRowProps) {
                 <Problems issues={fieldIssues(issues, "hints", i)} />
               </label>
             ))}
+          </fieldset>
+
+          <fieldset className="hintset">
+            <legend>Giver notes — private help for explaining</legend>
+            <label className="fld">
+              <span>What it looks like <small>(objects; for actions, what you would see; leave empty for abstract words)</small></span>
+              <textarea rows={2} value={w.giverInfo?.looks ?? ""} onChange={(e) => editInfo({ looks: e.target.value })} maxLength={LIMITS.giverLine} disabled={p.disabled} />
+            </label>
+            <label className="fld">
+              <span>How it is used <small>(or when it happens / when people say it)</small></span>
+              <textarea rows={2} value={w.giverInfo?.use ?? ""} onChange={(e) => editInfo({ use: e.target.value })} maxLength={LIMITS.giverLine} disabled={p.disabled} />
+            </label>
+            <label className="fld">
+              <span>Useful language <small>(one short sentence starter per line, up to {LIMITS.phrases})</small></span>
+              <textarea
+                key={`${w.id}:phrases`}
+                rows={3}
+                value={phraseText}
+                onChange={(e) => setPhraseText(e.target.value)}
+                onBlur={commitPhrases}
+                placeholder={"It looks like...\nYou use it when..."}
+                disabled={p.disabled}
+              />
+            </label>
+            <p className="note">Use plain English that is easier than the target word. The Giver sees these only as support — they are never read out for them.</p>
+            <Problems issues={fieldIssues(issues, "giverInfo")} />
+          </fieldset>
+
+          <fieldset className="hintset">
+            <legend>Japanese answers — for “I know it, but not in English!”</legend>
+            <label className="fld fld--ja">
+              <span>Approved Japanese equivalents <small>(comma-separated; at most {LIMITS.ja})</small></span>
+              <input
+                key={`${w.id}:${(w.ja ?? []).join("|")}`}
+                lang="ja"
+                value={jaText}
+                onChange={(e) => setJaText(e.target.value)}
+                onBlur={commitJa}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitJa(); } }}
+                placeholder="例: ざる、水切りざる"
+                disabled={p.disabled}
+              />
+            </label>
+            <p className="note">
+              A Japanese answer earns <b>half</b> the points <b>only if it matches one of these</b>. Matching is exact: hiragana/katakana, spaces and punctuation are ignored, but kanji spellings and synonyms must be listed here. Students never see this list before answering. AI suggestions are drafts — please check them. Leave empty to give no Japanese credit.
+            </p>
+            <Problems issues={fieldIssues(issues, "ja")} />
           </fieldset>
 
           <label className="fld">

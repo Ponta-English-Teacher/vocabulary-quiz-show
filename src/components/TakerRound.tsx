@@ -1,40 +1,83 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { currentWord, type GameAction, type GameState } from "@/lib/game";
+import { currentWord, type Feedback, type GameAction, type GameState } from "@/lib/game";
+import { RECOGNITION_LANG } from "@/lib/dictation";
+import { takerPointsFor } from "@/lib/scoring";
 import { PointsMeter } from "./PointsMeter";
 import { useDictation } from "./useDictation";
 import { SkipButton } from "./SkipButton";
 
 const QUESTION_STARTERS = [
-  "Is it a thing, an action, or a feeling?",
-  "Where can you find it?",
+  "Where do you use it?",
+  "What does it look like?",
   "Can you give me an example sentence?",
-  "What letter does it start with?",
+  "Is it a thing, an action, or a feeling?",
   "Is it something you use every day?",
+  "What is it made of?",
   "Does it have a similar word, or an opposite?",
-  "How many syllables does it have?",
   "Can you act it out?",
 ];
 
-/** Receives a REDACTED state (see redactForTaker) — it never holds the answer. */
+/** The message under an answer box. Each box shows only feedback about its own language. */
+function feedbackText(fb: Feedback | null, lang: Feedback["lang"]): string | null {
+  if (!fb || fb.lang !== lang) return null;
+  switch (fb.kind) {
+    case "wrong":
+      return lang === "ja" ? "That isn't the Japanese word we're looking for — keep asking questions, or try again." : "Not quite — keep asking questions!";
+    case "close":
+      return "So close! Check the spelling and try again.";
+    case "not-japanese":
+      return "Please type your answer in Japanese in this box. (To answer in English, go back.)";
+    case "no-ja-credit":
+      return "This word has no approved Japanese answer, so it can't earn points in Japanese. Keep asking questions, or answer in English.";
+  }
+}
+
+/** Receives a REDACTED state (see redactForTaker) — it never holds the answer, the Japanese answers or the unrevealed hints. */
 export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a: GameAction) => void }) {
   const word = currentWord(state);
   const [text, setText] = useState("");
+  const [jaText, setJaText] = useState("");
+  // Which answer box is open. English is the default; the Japanese box opens only from the "not in English" button.
+  const [mode, setMode] = useState<"en" | "ja">("en");
   const [tip, setTip] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const jaInputRef = useRef<HTMLInputElement>(null);
   const fb = state.feedback;
-  // Voice input fills the box with what was heard. The student can edit it; only "Lock it in" submits.
-  const mic = useDictation((heard) => setText(heard));
+  // Voice input fills the box with what was heard. The student can edit it; only the submit button sends it.
+  // The recognition language belongs to the box: English box → en-US, Japanese box → ja-JP.
+  const micEn = useDictation((heard) => setText(heard), RECOGNITION_LANG.en);
+  const micJa = useDictation((heard) => setJaText(heard), RECOGNITION_LANG.ja);
 
-  // Wrong guess: clear the box. Close guess: keep it so they can fix the spelling.
+  // Wrong guess: clear that box. Close guess: keep it so they can fix the spelling.
   useEffect(() => {
-    if (fb?.kind === "wrong") setText("");
-    if (fb) inputRef.current?.focus();
+    if (!fb) return;
+    if (fb.lang === "en") {
+      if (fb.kind === "wrong") setText("");
+      inputRef.current?.focus();
+    } else {
+      if (fb.kind === "wrong") setJaText("");
+      jaInputRef.current?.focus();
+    }
   }, [fb]);
 
   if (!word) return null;
   const taker = state.players[state.giver === 0 ? 1 : 0].name;
+  // The hints the Giver has revealed. The first one is the free opening hint and is there from the start of the round.
+  const shownHints = word.hints.slice(0, state.revealedHints).filter(Boolean);
+  const hasJapanese = (word.ja ?? []).length > 0; // the Taker only learns THAT a Japanese answer exists, never what it is
+  const jaPoints = takerPointsFor(state.hintsUsed, "ja");
+
+  const openJapanese = () => {
+    micEn.abort();
+    setMode("ja");
+    window.setTimeout(() => jaInputRef.current?.focus({ preventScroll: true }), 0);
+  };
+  const backToEnglish = () => {
+    micJa.abort();
+    setMode("en");
+  };
 
   return (
     <main className="screen round round--taker">
@@ -45,9 +88,22 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
         <h2 className="mystery" aria-label="Mystery word, hidden">
           <span>?</span><span>?</span><span>?</span><span>?</span><span>?</span>
         </h2>
-        <PointsMeter hintsUsed={state.hintsUsed} />
-        <p className="note">{state.hintsUsed === 0 ? "No hints used yet." : `${state.hintsUsed} hint${state.hintsUsed === 1 ? "" : "s"} used`}</p>
+        <PointsMeter hintsUsed={state.hintsUsed} showJapanese={hasJapanese} />
+        <p className="note">
+          {state.hintsUsed === 0 ? "Questions are free — ask as many as you like." : `${state.hintsUsed} extra hint${state.hintsUsed === 1 ? "" : "s"} used`}
+        </p>
       </section>
+
+      {shownHints.length > 0 ? (
+        <section className="clues" aria-label="Hints" aria-live="polite">
+          {shownHints.map((h, i) => (
+            <p key={i} className={`clue ${i === 0 ? "clue--opening" : ""}`}>
+              <span className="clue__tag">{i === 0 ? "Opening hint · free" : `Extra hint ${i}`}</span>
+              <span className="clue__text">{h}</span>
+            </p>
+          ))}
+        </section>
+      ) : null}
 
       <section className="ask">
         <h3 className="label">Ask your partner — out loud!</h3>
@@ -57,56 +113,122 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
         </button>
       </section>
 
-      <form
-        className="answer"
-        onSubmit={(e) => {
-          e.preventDefault();
-          mic.abort();
-          dispatch({ type: "GUESS", text });
-        }}
-      >
-        <label className="field field--answer" htmlFor="answer">
-          <span className="field__label">Your answer</span>
-        </label>
-        <div key={fb?.n ?? 0} className={`answer__box ${fb ? `is-${fb.kind}` : ""}`}>
-          <input
-            id="answer"
-            ref={inputRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Type, or tap 🎤 on your keyboard"
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            enterKeyHint="send"
-          />
-          <button
-            type="button"
-            className={`mic-btn ${mic.listening ? "is-on" : ""}`}
-            onClick={() => {
-              mic.toggle();
-              inputRef.current?.focus({ preventScroll: true });
+      {mode === "en" ? (
+        <>
+          <form
+            className="answer"
+            onSubmit={(e) => {
+              e.preventDefault();
+              micEn.abort();
+              dispatch({ type: "GUESS", text });
             }}
-            aria-pressed={mic.listening}
-            aria-label={mic.listening ? "Stop listening" : "Speak your answer"}
-            title={mic.listening ? "Tap to stop" : "Tap, then say your answer"}
           >
-            <span aria-hidden="true">{mic.listening ? "⏹" : "🎤"}</span>
-          </button>
-          <button type="submit" className="btn btn--hero btn--inline" disabled={!text.trim()}>
-            Lock it in
-          </button>
-        </div>
-        <p className={`feedback ${fb ? `feedback--${fb.kind}` : ""}`} role="status" aria-live="polite">
-          {fb?.kind === "wrong" ? "Not quite — keep asking questions!" : null}
-          {fb?.kind === "close" ? "So close! Check the spelling and try again." : null}
-        </p>
-        <p className="dictation-note" role="status" aria-live="polite">
-          {mic.listening ? "Listening… say your answer, then check the words below and press Lock it in." : mic.message}
-        </p>
-        <p className="note">Prefer to type? Typing always works — and your keyboard&apos;s own microphone key also dictates.</p>
-      </form>
+            <label className="field field--answer" htmlFor="answer">
+              <span className="field__label">Your answer in English</span>
+            </label>
+            <div key={fb?.lang === "en" ? fb.n : 0} className={`answer__box ${fb?.lang === "en" ? `is-${fb.kind}` : ""}`}>
+              <input
+                id="answer"
+                ref={inputRef}
+                lang="en"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Type, or tap 🎤 on your keyboard"
+                autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="send"
+              />
+              <button
+                type="button"
+                className={`mic-btn ${micEn.listening ? "is-on" : ""}`}
+                onClick={() => {
+                  micEn.toggle();
+                  inputRef.current?.focus({ preventScroll: true });
+                }}
+                aria-pressed={micEn.listening}
+                aria-label={micEn.listening ? "Stop listening" : "Speak your answer in English"}
+                title={micEn.listening ? "Tap to stop" : "Tap, then say your answer"}
+              >
+                <span aria-hidden="true">{micEn.listening ? "⏹" : "🎤"}</span>
+              </button>
+              <button type="submit" className="btn btn--hero btn--inline" disabled={!text.trim()}>
+                Lock it in
+              </button>
+            </div>
+            <p className={`feedback ${fb?.lang === "en" ? `feedback--${fb.kind}` : ""}`} role="status" aria-live="polite">
+              {feedbackText(fb, "en")}
+            </p>
+            <p className="dictation-note" role="status" aria-live="polite">
+              {micEn.listening ? "Listening… say your answer, then check the words below and press Lock it in." : micEn.message}
+            </p>
+            <p className="note">Prefer to type? Typing always works — and your keyboard&apos;s own microphone key also dictates.</p>
+          </form>
+
+          <div className="notenglish">
+            <button type="button" className="btn btn--ja" onClick={openJapanese}>
+              I know it, but not in English!
+            </button>
+            <p className="note">Answer in Japanese for half the points.</p>
+          </div>
+        </>
+      ) : (
+        <form
+          className="answer answer--ja"
+          lang="ja"
+          onSubmit={(e) => {
+            e.preventDefault();
+            micJa.abort();
+            dispatch({ type: "GUESS_JA", text: jaText });
+          }}
+        >
+          <label className="field field--answer" htmlFor="answer-ja">
+            <span className="field__label">日本語で答える · Answer in Japanese</span>
+          </label>
+          <p className="note">
+            {hasJapanese
+              ? `A correct Japanese answer earns ${jaPoints} points (half) and ends the round. You'll then learn the English word.`
+              : "This word has no approved Japanese answer, so Japanese can't earn points. Keep asking questions, or go back and answer in English."}
+          </p>
+          <div key={fb?.lang === "ja" ? fb.n : 0} className={`answer__box ${fb?.lang === "ja" ? `is-${fb.kind === "wrong" ? "wrong" : "close"}` : ""}`}>
+            <input
+              id="answer-ja"
+              ref={jaInputRef}
+              lang="ja"
+              value={jaText}
+              onChange={(e) => setJaText(e.target.value)}
+              placeholder="ここに日本語で入力"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="send"
+            />
+            <button
+              type="button"
+              className={`mic-btn ${micJa.listening ? "is-on" : ""}`}
+              onClick={() => {
+                micJa.toggle();
+                jaInputRef.current?.focus({ preventScroll: true });
+              }}
+              aria-pressed={micJa.listening}
+              aria-label={micJa.listening ? "Stop listening" : "Speak your answer in Japanese"}
+              title={micJa.listening ? "Tap to stop" : "Tap, then say your answer in Japanese"}
+            >
+              <span aria-hidden="true">{micJa.listening ? "⏹" : "🎤"}</span>
+            </button>
+            <button type="submit" className="btn btn--hero btn--inline" disabled={!jaText.trim() || !hasJapanese}>
+              答えを送る
+            </button>
+          </div>
+          <p className="feedback feedback--wrong" role="status" aria-live="polite">{feedbackText(fb, "ja")}</p>
+          <p className="dictation-note" role="status" aria-live="polite">
+            {micJa.listening ? "聞いています… Check the words, fix them if needed, then press 答えを送る." : micJa.message}
+          </p>
+          <button type="button" className="btn btn--link" onClick={backToEnglish}>← Back to the English answer</button>
+        </form>
+      )}
 
       <SkipButton onSkip={() => dispatch({ type: "SKIP" })} />
     </main>

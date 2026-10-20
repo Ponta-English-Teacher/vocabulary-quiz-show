@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import { currentWord, type GameAction, type GameState } from "@/lib/game";
+import { currentWord, paidRevealedHints, spokenHints, type GameAction, type GameState } from "@/lib/game";
+import { giverNotesFor } from "@/lib/giverNotes";
 import { RATES, stopSpeaking } from "@/lib/speech";
+import { SCORING } from "@/lib/scoring";
 import { useCanSpeak } from "@/lib/useSpeech";
 import { SpeakButton } from "./SpeakButton";
 import { PointsMeter } from "./PointsMeter";
@@ -16,8 +18,12 @@ export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a
   if (!word) return null;
 
   const giver = state.players[state.giver].name;
-  const spoken = state.hintsUsed - state.revealedHints;
+  const spoken = spokenHints(state);
+  const paid = paidRevealedHints(state);
   const fb = state.feedback;
+  const notes = giverNotesFor(word);
+  const opening = word.hints[0];
+  const nextHint = state.revealedHints; // index of the next hint to reveal (the first paid one is index 1)
 
   return (
     <main className="screen round round--giver">
@@ -38,16 +44,44 @@ export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a
         {!canSpeak ? <p className="note">Pronunciation isn&apos;t available in this browser.</p> : null}
       </section>
 
+      {opening ? (
+        <section className="clues" aria-label="Opening hint">
+          <p className="clue clue--opening">
+            <span className="clue__tag">Opening hint · free · {state.players[state.giver === 0 ? 1 : 0].name} can see it</span>
+            <span className="clue__text">{opening}</span>
+          </p>
+          <p className="note">Start from here. Your partner asks questions — answer them in English. Talking is always free.</p>
+        </section>
+      ) : null}
+
       <section className="meaning">
         <h3 className="label">Meaning</h3>
         <p className="meaning__text">{word.meaning}</p>
         <p className="meaning__eg">“{word.example}”</p>
-        <p className="note">Explain it in your own words. Don&apos;t say or spell the word!</p>
+      </section>
+
+      <section className="giver-help" aria-label="Help for explaining">
+        <h3 className="label">Help for explaining</h3>
+        {notes.looks ? (
+          <p className="giver-help__row"><b>{notes.looksLabel}</b><span>{notes.looks}</span></p>
+        ) : null}
+        {notes.use ? (
+          <p className="giver-help__row"><b>{notes.useLabel}</b><span>{notes.use}</span></p>
+        ) : null}
+        <div className="giver-help__row giver-help__row--phrases">
+          <b>Useful language</b>
+          <ul className="phrases">
+            {notes.phrases.map((p, i) => <li key={i}>{p}</li>)}
+          </ul>
+        </div>
+        <p className="note">
+          This is support, not a script — answer your partner&apos;s questions in your own words. Don&apos;t say or spell the word!
+        </p>
       </section>
 
       <section className="hints" aria-label="Hints">
         <div className="hints__head">
-          <h3 className="label">Hints given</h3>
+          <h3 className="label">Extra hints</h3>
           <PointsMeter hintsUsed={state.hintsUsed} />
         </div>
 
@@ -63,7 +97,7 @@ export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a
           </button>
           <div className="counter__value" aria-live="polite">
             <b>{state.hintsUsed}</b>
-            <span>{spoken > 0 ? `${state.revealedHints} prepared + ${spoken} spoken` : "hints used"}</span>
+            <span>{spoken > 0 ? `${paid} prepared + ${spoken} spoken` : "extra hints used"}</span>
           </div>
           <button
             type="button"
@@ -74,18 +108,18 @@ export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a
             +
           </button>
         </div>
-        <p className="note">Gave your own spoken clue? Tap + to count it.</p>
+        <p className="note">Gave an extra clue of your own, beyond answering questions? Tap + to count it. The opening hint and ordinary answers are free.</p>
 
         <ol className="ladder">
           {word.hints.map((h, i) => {
             const shown = i < state.revealedHints;
-            const next = i === state.revealedHints;
+            const next = i === nextHint;
             return (
               <li key={i} className={shown ? "is-shown" : ""}>
                 <span className="ladder__n">{i + 1}</span>
                 {shown ? (
                   <>
-                    <span className="ladder__text">{h}</span>
+                    <span className="ladder__text">{h}{i === 0 ? <em className="ladder__free"> (opening · free)</em> : null}</span>
                     <SpeakButton id={`hint-${i}`} text={h} rate={RATES.hint} label={`hint ${i + 1}`} variant="icon" />
                   </>
                 ) : (
@@ -95,7 +129,7 @@ export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a
                     disabled={!next}
                     onClick={() => dispatch({ type: "REVEAL_HINT" })}
                   >
-                    {next ? "Reveal prepared hint" : "Locked"}
+                    {next ? `Reveal extra hint (−${SCORING.PER_HINT} pts)` : "Locked"}
                   </button>
                 )}
               </li>
@@ -105,9 +139,11 @@ export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a
       </section>
 
       <p className="taker-watch" aria-live="polite">
-        {fb
-          ? <>Taker tried “{fb.guess}” — {fb.kind === "close" ? "so close!" : "not yet."}</>
-          : <>Waiting for {state.players[state.giver === 0 ? 1 : 0].name}&apos;s guess…</>}
+        {fb && (fb.kind === "wrong" || fb.kind === "close")
+          ? <>Taker tried{fb.lang === "ja" ? " in Japanese" : ""} “{fb.guess}” — {fb.kind === "close" ? "so close!" : "not yet."}</>
+          : fb && fb.lang === "ja"
+            ? <>Taker tried a Japanese answer — it can&apos;t score for this word.</>
+            : <>Waiting for {state.players[state.giver === 0 ? 1 : 0].name}&apos;s guess…</>}
       </p>
 
       <SkipButton onSkip={() => dispatch({ type: "SKIP" })} />

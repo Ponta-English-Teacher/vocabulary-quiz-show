@@ -37,38 +37,7 @@ export function Welcome({
         <p className="tagline">Explain it. Guess it. <em>Say it out loud.</em></p>
       </div>
 
-      <form
-        className="welcome__form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          play("tap");
-          onStart([a, b]);
-        }}
-      >
-        <label className="field">
-          <span className="field__label">Contestant 1</span>
-          <input
-            value={a}
-            onChange={(e) => setA(e.target.value)}
-            maxLength={MAX_NAME_LENGTH}
-            placeholder="Player 1"
-            autoComplete="off"
-            autoCapitalize="words"
-            enterKeyHint="next"
-          />
-        </label>
-        <label className="field">
-          <span className="field__label">Contestant 2</span>
-          <input
-            value={b}
-            onChange={(e) => setB(e.target.value)}
-            maxLength={MAX_NAME_LENGTH}
-            placeholder="Player 2"
-            autoComplete="off"
-            autoCapitalize="words"
-            enterKeyHint="go"
-          />
-        </label>
+      <div className="welcome__form">
         {sets.length > 1 ? (
           <label className="field">
             <span className="field__label">Word set</span>
@@ -79,23 +48,62 @@ export function Welcome({
             </select>
           </label>
         ) : null}
-        <button type="submit" className="btn btn--hero">Start Game</button>
-        <button type="button" className="btn btn--studio" onClick={onOpenStudio}>
-          Teacher Studio
-        </button>
-        <HostClass set={sets.find((x) => x.id === selectedId) ?? sets[0]} />
-        <button type="button" className="btn btn--ghost" disabled aria-describedby="pair-note">
-          Pair two phones
-        </button>
-        <p id="pair-note" className="note">
-          Coming soon — this prototype runs both roles on <strong>one screen</strong> (demo mode).
-        </p>
-      </form>
+
+        <section className="mode mode--class" aria-labelledby="mode-class">
+          <h2 id="mode-class" className="mode__title"><span className="mode__badge">Classroom mode</span> Two phones</h2>
+          <p className="note">
+            Each student plays on their own phone with a private screen: one is the Giver, the other is the Taker.
+            Students scan the teacher&apos;s QR code, then enter a name and a group number.
+          </p>
+          <HostClass set={sets.find((x) => x.id === selectedId) ?? sets[0]} />
+          <button type="button" className="btn btn--studio" onClick={onOpenStudio}>
+            Teacher Studio
+          </button>
+        </section>
+
+        <form
+          className="mode mode--demo"
+          aria-labelledby="mode-demo"
+          onSubmit={(e) => {
+            e.preventDefault();
+            play("tap");
+            onStart([a, b]);
+          }}
+        >
+          <h2 id="mode-demo" className="mode__title"><span className="mode__badge mode__badge--demo">Demo mode</span> One screen</h2>
+          <p className="note">Try the game on this one screen — both roles share it. Not for class use: the Taker could see the Giver&apos;s screen.</p>
+          <label className="field">
+            <span className="field__label">Contestant 1</span>
+            <input
+              value={a}
+              onChange={(e) => setA(e.target.value)}
+              maxLength={MAX_NAME_LENGTH}
+              placeholder="Player 1"
+              autoComplete="off"
+              autoCapitalize="words"
+              enterKeyHint="next"
+            />
+          </label>
+          <label className="field">
+            <span className="field__label">Contestant 2</span>
+            <input
+              value={b}
+              onChange={(e) => setB(e.target.value)}
+              maxLength={MAX_NAME_LENGTH}
+              placeholder="Player 2"
+              autoComplete="off"
+              autoCapitalize="words"
+              enterKeyHint="go"
+            />
+          </label>
+          <button type="submit" className="btn btn--hero">Start demo game</button>
+        </form>
+      </div>
 
       <ol className="howto">
-        <li><span><b>Giver</b> sees the word and explains it — out loud, never reading it.</span></li>
-        <li><span><b>Taker</b> asks questions, then types or dictates a guess.</span></li>
-        <li><span>Fewer hints, more points. Swap roles after every word.</span></li>
+        <li><span><b>Giver</b> sees the word and explains it — out loud, never reading it. The opening hint is free.</span></li>
+        <li><span><b>Taker</b> asks as many questions as they like, then types or says a guess. Know it but not in English? Answer in Japanese for half the points.</span></li>
+        <li><span>Extra hints cost points. Swap roles after every word.</span></li>
       </ol>
     </main>
   );

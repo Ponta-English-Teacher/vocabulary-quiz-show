@@ -29,8 +29,28 @@ export interface VocabWord {
   meaning: string;
   /** Example sentence for the Giver (may contain the word). */
   example: string;
-  /** Prepared hints, ordered from hardest to easiest. Never contain the word. */
+  /**
+   * Prepared hints. Hint 1 is the OPENING hint: it is shown to both players automatically when the round
+   * starts and is free. Hints 2 and 3 are optional and cost points. None of them contain the word.
+   */
   hints: string[];
+  /** Optional Giver-only support: simple English the Giver can use to answer questions. Older sets lack it. */
+  giverInfo?: GiverInfo;
+  /**
+   * Approved Japanese equivalents (e.g. ["ざる", "水切りざる"]). SERVER-SIDE answer data: it is never sent to the
+   * Taker (or the Giver) while the word is in play. Empty or missing = no Japanese credit for this word.
+   */
+  ja?: string[];
+}
+
+/** Giver-only support for explaining a word naturally. Every field is optional and adapts to the kind of word. */
+export interface GiverInfo {
+  /** What it looks like (objects) or what you would see happening (actions). Left out for abstract words. */
+  looks?: string;
+  /** How it is used, when it happens, or when people say it. */
+  use?: string;
+  /** Two to four short, speakable sentence starters ("It looks like...", "You use it when..."). */
+  phrases?: string[];
 }
 
 export interface VocabSet {
@@ -54,10 +74,16 @@ export const SAMPLE_SET: VocabSet = {
       meaning: "An object you hold over your head to keep dry when it rains.",
       example: "Don't forget your umbrella — it's going to rain this afternoon.",
       hints: [
-        "You carry it on certain kinds of weather days.",
-        "It has a handle and folds up small.",
-        "It starts with the letter U.",
+        "You open this when you walk outside and the rain starts to fall.",
+        "It has a handle and a round cover on top. It folds up small.",
+        "A raincoat keeps you dry too, but this one you hold in your hand.",
       ],
+      giverInfo: {
+        looks: "It has a long handle and a round cover on top. It opens and closes.",
+        use: "You hold it over your head when it rains. You keep it in your bag when it is sunny.",
+        phrases: ["It looks like...", "You use it when...", "It has...", "You hold it..."],
+      },
+      ja: ["傘", "かさ"],
     },
     {
       id: "w02",
@@ -68,10 +94,16 @@ export const SAMPLE_SET: VocabSet = {
       meaning: "A tool with two blades that you use to cut paper or cloth.",
       example: "Can I borrow your scissors to open this package?",
       hints: [
-        "You find it in a desk drawer or a pencil case.",
+        "You take this out when you open a package or cut a picture from paper.",
         "It has two handles with holes for your fingers.",
-        "It is used for cutting paper — snip, snip!",
+        "It has two sharp blades that work together — snip, snip!",
       ],
+      giverInfo: {
+        looks: "It has two sharp blades and two handles. The handles have holes for your fingers.",
+        use: "You hold the handles and open and close them. The blades cut paper, cloth or hair.",
+        phrases: ["It looks like...", "You use it to cut...", "It has two...", "You hold it with..."],
+      },
+      ja: ["はさみ", "鋏"],
     },
     {
       id: "w03",
@@ -82,10 +114,16 @@ export const SAMPLE_SET: VocabSet = {
       meaning: "To speak very quietly so that only a person close to you can hear.",
       example: "She leaned over and whispered a secret in my ear.",
       hints: [
-        "It is a way of using your voice.",
-        "You do this in a library, or when you tell a secret.",
+        "You do this in a library, or when you tell a friend a secret.",
+        "You use your voice, but it is very quiet and soft.",
         "It is the opposite of shout.",
       ],
+      giverInfo: {
+        looks: "The person moves close to your ear. They speak very, very quietly.",
+        use: "You do this when you do not want other people to hear. You do it in a quiet place.",
+        phrases: ["It is a way to speak...", "You do this when...", "It is the opposite of..."],
+      },
+      ja: ["ささやく", "囁く", "ささやき"],
     },
     {
       id: "w04",
@@ -96,10 +134,16 @@ export const SAMPLE_SET: VocabSet = {
       meaning: "To take something from someone and promise to give it back later.",
       example: "Can I borrow your pen? I'll give it back after class.",
       hints: [
-        "It happens between two people, or with a library.",
-        "You must return the thing afterwards.",
+        "You forget your pen, so you ask a friend to give you one for a short time.",
+        "You must give the thing back after you use it.",
         "Its opposite is 'lend'.",
       ],
+      giverInfo: {
+        looks: "One person gives something to another person for a short time. Later, it goes back.",
+        use: "You do this with a book from the library or a pen from a friend. You ask: 'Can I use your pen for a minute?'",
+        phrases: ["It is when you take something...", "You must give it back...", "You do this when..."],
+      },
+      ja: ["借りる", "かりる", "借ります"],
     },
     {
       id: "w05",
@@ -110,10 +154,15 @@ export const SAMPLE_SET: VocabSet = {
       meaning: "The last day or time by which something must be finished.",
       example: "The deadline for the report is Friday at noon.",
       hints: [
-        "Students and workers often feel stress about it.",
-        "It is a point in time, not a place or a thing.",
-        "Your essay must be handed in before this.",
+        "Your teacher says your report is due on Friday at noon, and you feel stressed.",
+        "It is a day and a time, not a place or a thing.",
+        "If you finish after this time, you are late.",
       ],
+      giverInfo: {
+        use: "Teachers and bosses give you this for homework or work. It is the last day or time to finish.",
+        phrases: ["It is a time...", "You have to finish before...", "If you are late..."],
+      },
+      ja: ["締め切り", "締切", "しめきり", "期限"],
     },
     {
       id: "w06",
@@ -124,10 +173,16 @@ export const SAMPLE_SET: VocabSet = {
       meaning: "Not wanting to do something, and slow to agree to do it.",
       example: "He was reluctant to sing in front of the whole class.",
       hints: [
-        "It describes how a person feels before doing something.",
-        "You might feel this about going to the dentist.",
-        "It means 'unwilling' or 'not keen'. It starts with R.",
+        "The teacher asks you to sing in front of the whole class, but you do not really want to.",
+        "You feel this before you do something you do not like. You move slowly.",
+        "It means 'unwilling'. You say yes, but only after a long time.",
       ],
+      giverInfo: {
+        looks: "The person looks slow and nervous. They do not smile much.",
+        use: "You feel this about going to the dentist, or speaking in front of many people.",
+        phrases: ["It describes a person who...", "You feel this when...", "It is like saying 'I don't want to...'"],
+      },
+      ja: ["気が進まない", "気乗りしない", "乗り気でない", "渋々", "しぶしぶ", "いやいや", "嫌々"],
     },
     {
       id: "w07",
@@ -138,10 +193,15 @@ export const SAMPLE_SET: VocabSet = {
       meaning: "Something you buy for much less than its usual price.",
       example: "These shoes were only 20 dollars — what a bargain!",
       hints: [
-        "You are happy when you find one in a shop.",
+        "You find a nice pair of shoes in a shop, and they cost much less than usual.",
         "It is connected with sales and discounts.",
-        "It is a very good price. It starts with B.",
+        "It is a very good price, and it makes you happy when you buy it.",
       ],
+      giverInfo: {
+        use: "You say it when you buy something good for a low price. Shops have it in a sale.",
+        phrases: ["It is something you buy...", "It costs less than...", "You feel happy because..."],
+      },
+      ja: ["お買い得", "お買い得品", "掘り出し物", "バーゲン"],
     },
     {
       id: "w08",
@@ -152,10 +212,16 @@ export const SAMPLE_SET: VocabSet = {
       meaning: "Feeling happy and a little sad when you remember the past.",
       example: "Looking at old school photos made her feel nostalgic.",
       hints: [
-        "Old songs, photos or toys can cause this feeling.",
-        "It is a mix of happy and sad.",
-        "You feel this when you miss your childhood. It starts with N.",
+        "You find an old photo from your school days. You smile, but you also feel a little sad.",
+        "It is a mix of happy and sad feelings about the past.",
+        "You feel this when you miss your childhood days.",
       ],
+      giverInfo: {
+        looks: "The person smiles softly and looks at old photos or toys.",
+        use: "Old songs, photos, toys or food can give you this feeling. It is about the past.",
+        phrases: ["It is a feeling...", "You feel this when you remember...", "It is happy and sad together."],
+      },
+      ja: ["懐かしい", "なつかしい", "ノスタルジック", "懐かしむ"],
     },
     {
       id: "w09",
@@ -166,10 +232,16 @@ export const SAMPLE_SET: VocabSet = {
       meaning: "To keep delaying something you should do, usually because you don't want to do it.",
       example: "I always procrastinate instead of starting my homework.",
       hints: [
-        "Many students do this the night before an exam.",
-        "You watch videos instead of studying.",
-        "It means to put off a task until later. It starts with P.",
+        "It is the night before an exam, and you are watching videos instead of studying.",
+        "You know you should do the work, but you keep waiting.",
+        "It means to put off a task until later.",
       ],
+      giverInfo: {
+        looks: "A person sits at a desk. They check their phone again and again. The work is still not done.",
+        use: "Many students do this before a test or a report. They do other things first.",
+        phrases: ["It is when you wait to do...", "You know you should..., but you...", "You do it later and later."],
+      },
+      ja: ["先延ばしにする", "先延ばしする", "先送りにする", "後回しにする", "ぐずぐずする"],
     },
     {
       id: "w10",
@@ -181,10 +253,16 @@ export const SAMPLE_SET: VocabSet = {
       meaning: "A large bag with a handle that you use to carry clothes when you travel.",
       example: "She packed her suitcase the night before the trip.",
       hints: [
-        "You see lots of these at an airport.",
+        "You see people pulling these through the airport before a trip.",
         "It often has wheels and a handle.",
         "You pack your clothes in it for a holiday.",
       ],
+      giverInfo: {
+        looks: "It is a big box-shaped bag. It often has wheels and a long handle.",
+        use: "You put your clothes inside before a trip. You pull it at the airport or the station.",
+        phrases: ["It looks like...", "You use it when you...", "You put ... inside.", "It has wheels and..."],
+      },
+      ja: ["スーツケース", "旅行かばん", "キャリーケース", "キャリーバッグ"],
     },
   ],
 };

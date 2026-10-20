@@ -113,7 +113,7 @@ export function mockHints(word: VocabWord): [string, string, string] {
   const masked = word.meaning.replace(new RegExp(`\\b${stem}\\w*`, "gi"), "___");
   const first = word.word[0].toUpperCase();
   const hints: [string, string, string] = [
-    `It belongs to the topic “${word.category}”.`,
+    `Imagine a moment in everyday life connected with “${word.category}”.`,
     `Think about this meaning: ${masked.charAt(0).toLowerCase()}${masked.slice(1)}`,
     `It is a ${word.partOfSpeech === "phrase" ? "phrase" : word.partOfSpeech} that starts with “${first}”.`,
   ];

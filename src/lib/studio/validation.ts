@@ -1,5 +1,6 @@
-import { CEFR_LEVELS, PARTS_OF_SPEECH, type CefrLevel, type PartOfSpeech, type VocabWord } from "@/data/vocab";
+import { CEFR_LEVELS, PARTS_OF_SPEECH, type CefrLevel, type GiverInfo, type PartOfSpeech, type VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
+import { normalizeJa } from "@/lib/japanese";
 import { newId } from "./ids";
 
 /**
@@ -10,12 +11,18 @@ import { newId } from "./ids";
  *  parseGeneratedWords  coerce + validate + de-duplicate a whole AI list
  */
 
-export const LIMITS = { word: 60, category: 60, meaning: 300, example: 300, hint: 200, accept: 8 } as const;
+export const LIMITS = {
+  word: 60, category: 60, meaning: 300, example: 300, hint: 200, accept: 8,
+  /** Giver notes: each line is meant to be said aloud, so keep it short. */
+  giverLine: 200, phrase: 100, phrases: 4,
+  /** Approved Japanese equivalents. */
+  ja: 8, jaItem: 40,
+} as const;
 
 export interface WordIssue {
   /** Machine-readable reason, where one matters (e.g. AI output with letter-only hints is rejected). */
-  code?: "letter-only" | "too-short";
-  field: "word" | "accept" | "partOfSpeech" | "cefr" | "category" | "meaning" | "example" | "hints";
+  code?: "letter-only" | "too-short" | "vague-opening" | "no-japanese" | "no-giver-info";
+  field: "word" | "accept" | "partOfSpeech" | "cefr" | "category" | "meaning" | "example" | "hints" | "giverInfo" | "ja";
   hintIndex?: number;
   severity: "error" | "warning";
   message: string;
@@ -82,6 +89,18 @@ const LETTER_ONLY: RegExp[] = [
 export const isLetterOnlyHint = (h: string): boolean => LETTER_ONLY.some((r) => r.test(h.trim()));
 const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
+/**
+ * The OPENING hint is shown to both players automatically, so it must set a real scene (who, when, where) —
+ * not a label such as "It is a kitchen tool." These patterns catch the generic ones only.
+ */
+const VAGUE_OPENING: RegExp[] = [
+  /^(?:it|this|that)(?:'s| is| are)? (?:a |an |the )?(?:[a-z]+ )?(?:tool|object|item|thing|word|utensil|device|noun|verb|adjective|action|feeling|expression)s?\.?$/i,
+  /^(?:it|this)(?:'s| is)? (?:used|found|seen|kept) (?:in|at|on) (?:the |a |your )?(?:kitchen|house|home|school|office|shop|store|bathroom|garden)\.?$/i,
+  /^(?:it|this)(?:'s| is)? used for (?:cooking|cleaning|eating|working|studying|learning|travel|shopping)\.?$/i,
+  /^it belongs to the topic\b/i,
+];
+export const isVagueOpeningHint = (h: string): boolean => VAGUE_OPENING.some((r) => r.test(h.trim()));
+
 export function validateWord(w: VocabWord): WordIssue[] {
   const issues: WordIssue[] = [];
   const err = (field: WordIssue["field"], message: string, hintIndex?: number) =>
@@ -118,7 +137,34 @@ export function validateWord(w: VocabWord): WordIssue[] {
       warn("hints", `Hint ${i + 1} is very short — a fuller clue helps the Giver.`, i, "too-short");
     }
   });
+  if (w.hints[0]?.trim() && isVagueOpeningHint(w.hints[0])) {
+    warn("hints", "Hint 1 is shown to both players automatically for free — make it a real situation (who, when, where), not just a label like “it is a kitchen tool”.", 0, "vague-opening");
+  }
   if (new Set(w.hints.map(normalize)).size < w.hints.filter((h) => h.trim()).length) warn("hints", "Two hints are identical.");
+
+  // Giver notes: optional, but they must be speakable and must not contain the word the Giver may not say.
+  const info = w.giverInfo;
+  if (!info || (!info.looks && !info.use && !(info.phrases ?? []).length)) {
+    warn("giverInfo", "No Giver notes yet — the Giver will see only the definition and hints.", undefined, "no-giver-info");
+  } else {
+    const lines: [string, string | undefined][] = [["Appearance", info.looks], ["Use", info.use], ...(info.phrases ?? []).map((p, i): [string, string] => [`Useful phrase ${i + 1}`, p])];
+    for (const [label, text] of lines) {
+      if (!text) continue;
+      if (leaksTarget(w, text)) warn("giverInfo", `${label} contains the target word — the Giver is not allowed to say it.`);
+      if (text.length > (label.startsWith("Useful") ? LIMITS.phrase : LIMITS.giverLine)) err("giverInfo", `${label} is too long to say aloud.`);
+    }
+    if ((info.phrases ?? []).length > LIMITS.phrases) err("giverInfo", `At most ${LIMITS.phrases} useful phrases.`);
+  }
+
+  // Japanese equivalents drive Japanese answers. No approved entry = no Japanese credit for this word.
+  const ja = (w.ja ?? []).filter((j) => j.trim());
+  if (!ja.length) {
+    warn("ja", "No Japanese answer — Taker can't earn Japanese (half) credit for this word.", undefined, "no-japanese");
+  } else {
+    if (ja.length > LIMITS.ja) err("ja", `At most ${LIMITS.ja} Japanese answers.`);
+    if (ja.some((j) => j.length > LIMITS.jaItem)) err("ja", `Each Japanese answer must be ${LIMITS.jaItem} characters or fewer.`);
+    if (new Set(ja.map(normalizeJa)).size < ja.length) warn("ja", "Two Japanese answers are the same once kana/spacing differences are ignored.");
+  }
 
   if ((w.accept ?? []).length > LIMITS.accept) err("accept", `At most ${LIMITS.accept} alternative answers.`);
   return issues;
@@ -127,6 +173,32 @@ export function validateWord(w: VocabWord): WordIssue[] {
 export const hasErrors = (issues: WordIssue[]) => issues.some((i) => i.severity === "error");
 
 export type CoerceResult = { word: VocabWord } | { errors: string[] };
+
+export function coerceGiverInfo(raw: unknown): GiverInfo | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  const looks = str(r.looks).slice(0, LIMITS.giverLine);
+  const use = str(r.use).slice(0, LIMITS.giverLine);
+  const phrases = (Array.isArray(r.phrases) ? r.phrases : []).map((p) => str(p).slice(0, LIMITS.phrase)).filter(Boolean).slice(0, LIMITS.phrases);
+  if (!looks && !use && !phrases.length) return undefined;
+  return { ...(looks ? { looks } : {}), ...(use ? { use } : {}), ...(phrases.length ? { phrases } : {}) };
+}
+
+/** Japanese equivalents: a list (or one comma-separated string), de-duplicated once kana/spacing differences are ignored. */
+export function coerceJa(raw: unknown): string[] {
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(/[,、，;；\/／]/) : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of list) {
+    const s = str(item).slice(0, LIMITS.jaItem);
+    const key = normalizeJa(s);
+    if (s && key && !seen.has(key)) {
+      seen.add(key);
+      out.push(s);
+    }
+  }
+  return out.slice(0, LIMITS.ja);
+}
 
 /** Turn loosely-typed data (from an AI or storage) into a VocabWord. Does not apply content rules. */
 export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResult {
@@ -162,6 +234,10 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
     }
   }
 
+  // Optional fields — sets saved before they existed simply don't have them. The AI may send them flat or nested.
+  const giverInfo = coerceGiverInfo(r.giverInfo ?? { looks: r.looks, use: r.use, phrases: r.phrases });
+  const ja = coerceJa(r.ja ?? r.japanese);
+
   if (errors.length || !pos || !cefr) return { errors };
   return {
     word: {
@@ -174,6 +250,8 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
       meaning,
       example,
       hints: hintsRaw.slice(0, 3),
+      ...(giverInfo ? { giverInfo } : {}),
+      ...(ja.length ? { ja } : {}),
     },
   };
 }
@@ -221,7 +299,7 @@ export function parseGeneratedWords(
     }
     const w = coerced.word;
     // AI output must be clean: errors AND letter-only hints are rejected (teachers may still keep one by hand).
-    const problems = validateWord(w).filter((p) => p.severity === "error" || p.code === "letter-only");
+    const problems = validateWord(w).filter((p) => p.severity === "error" || p.code === "letter-only" || p.code === "vague-opening");
     if (problems.length) {
       issues.push(`${label} (“${w.word}”): ${problems.map((p) => p.message).join(" ")}`);
       return;

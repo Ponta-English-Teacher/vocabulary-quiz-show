@@ -5,7 +5,9 @@ import { coerceWord, leaksTarget, parseGeneratedWords, validateWord } from "./va
 const raw = (over: Record<string, unknown> = {}) => ({
   word: "umbrella", accept: ["umbrellas"], partOfSpeech: "noun", cefr: "a2", category: "Everyday objects",
   meaning: "Something you hold over your head when it rains.", example: "Take an umbrella.",
-  hints: ["You see many of these outside a train station when it pours.", "It folds up small and has a long handle.", "People hold it above their heads to stay dry in the rain."], ...over,
+  hints: ["You see many of these outside a train station when it pours.", "It folds up small and has a long handle.", "People hold it above their heads to stay dry in the rain."],
+  giverInfo: { looks: "It has a long handle and a round cover.", use: "You hold it over your head in the rain.", phrases: ["It looks like...", "You use it when..."] },
+  ja: ["傘", "かさ"], ...over,
 });
 const good = (over: Record<string, unknown> = {}): VocabWord => {
   const c = coerceWord(raw(over));

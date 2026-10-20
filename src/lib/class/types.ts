@@ -33,6 +33,7 @@ export type ClientAction =
   | { type: "REVEAL_HINT" }
   | { type: "ADJUST_HINTS"; delta: 1 | -1 }
   | { type: "GUESS"; text: string }
+  | { type: "GUESS_JA"; text: string }
   | { type: "SKIP" }
   | { type: "NEXT" }
   | { type: "CONTINUE" }

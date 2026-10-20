@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { checkDictationSupport, createDictation, dictationErrorMessage, getRecognitionCtor, type RecognitionEventLike, type RecognitionLike } from "./dictation";
+import { checkDictationSupport, createDictation, dictationErrorMessage, getRecognitionCtor, RECOGNITION_LANG, type RecognitionEventLike, type RecognitionLike } from "./dictation";
 
 class FakeRecognition implements RecognitionLike {
   static instances: FakeRecognition[] = [];
@@ -112,11 +112,15 @@ describe("recognised words only fill the box — nothing is submitted", () => {
   });
   it("the Taker screen puts dictated text in the input and submits only through the form's own submit", () => {
     const src = readFileSync(new URL("../components/TakerRound.tsx", import.meta.url), "utf8");
-    expect(src).toContain("useDictation((heard) => setText(heard))");
-    expect(src.match(/type: "GUESS"/g)).toHaveLength(1); // the single submit path
-    expect(src).toMatch(/onSubmit=\{\(e\) => \{[^}]*mic\.abort\(\);[^}]*dispatch\(\{ type: "GUESS"/s);
-    expect(src).toMatch(/type="submit"/);
-    expect(src).toMatch(/aria-label=\{mic\.listening \? "Stop listening" : "Speak your answer"\}/);
+    expect(src).toContain("useDictation((heard) => setText(heard), RECOGNITION_LANG.en)");
+    expect(src).toContain("useDictation((heard) => setJaText(heard), RECOGNITION_LANG.ja)");
+    expect(src.match(/type: "GUESS"/g)).toHaveLength(1); // the single English submit path
+    expect(src.match(/type: "GUESS_JA"/g)).toHaveLength(1); // the single Japanese submit path
+    expect(src).toMatch(/onSubmit=\{\(e\) => \{[^}]*micEn\.abort\(\);[^}]*dispatch\(\{ type: "GUESS"/s);
+    expect(src).toMatch(/onSubmit=\{\(e\) => \{[^}]*micJa\.abort\(\);[^}]*dispatch\(\{ type: "GUESS_JA"/s);
+    expect(src.match(/type="submit"/g)).toHaveLength(2); // one submit button per box, nothing else submits
+    expect(src).toMatch(/aria-label=\{micEn\.listening \? "Stop listening" : "Speak your answer in English"\}/);
+    expect(src).toMatch(/aria-label=\{micJa\.listening \? "Stop listening" : "Speak your answer in Japanese"\}/);
     expect(src).toMatch(/Typing always works/); // typing stays a fully functional alternative
   });
 });
@@ -173,7 +177,65 @@ describe("errors, stopping and privacy", () => {
 
 it("the hook is only invoked from a button press — the TakerRound never calls toggle on mount", () => {
   const src = readFileSync(new URL("../components/TakerRound.tsx", import.meta.url), "utf8");
-  expect(src.match(/mic\.toggle\(\)/g)).toHaveLength(1);
-  expect(src).not.toMatch(/useEffect\([^)]*mic\.toggle/s);
+  expect(src.match(/micEn\.toggle\(\)/g)).toHaveLength(1);
+  expect(src.match(/micJa\.toggle\(\)/g)).toHaveLength(1);
+  expect(src).not.toMatch(/useEffect\([^)]*mic(En|Ja)\.toggle/s);
+  expect(src).not.toMatch(/\.start\(\)/); // nothing starts listening except the press handler in the hook
   vi.fn();
+});
+
+describe("microphone language follows the answer box", () => {
+  const setupLang = (lang?: (typeof RECOGNITION_LANG)[keyof typeof RECOGNITION_LANG]) => {
+    FakeRecognition.instances = [];
+    const text: [string, boolean][] = [];
+    const errors: string[] = [];
+    const d = createDictation(FakeRecognition, { onText: (t, f) => text.push([t, f]), onListening: () => {}, onError: (m) => errors.push(m) }, lang ? { lang } : {});
+    return { d, text, errors, rec: () => FakeRecognition.instances[FakeRecognition.instances.length - 1] };
+  };
+  it("defines exactly two recognition languages: en-US and ja-JP", () => {
+    expect(RECOGNITION_LANG).toEqual({ en: "en-US", ja: "ja-JP" });
+  });
+  it("the normal English answer box listens for en-US (also when no language is given)", () => {
+    for (const lang of [undefined, RECOGNITION_LANG.en] as const) {
+      const { d, rec } = setupLang(lang);
+      d.start();
+      expect(rec().lang).toBe("en-US");
+    }
+  });
+  it("the Japanese answer box listens for ja-JP", () => {
+    const { d, rec } = setupLang(RECOGNITION_LANG.ja);
+    d.start();
+    expect(rec().lang).toBe("ja-JP");
+    expect(rec()).toMatchObject({ continuous: false, interimResults: true }); // still one short, press-to-talk utterance
+  });
+  it("neither box listens until its microphone button is pressed", () => {
+    const en = setupLang(RECOGNITION_LANG.en), ja = setupLang(RECOGNITION_LANG.ja);
+    expect(FakeRecognition.instances).toHaveLength(0);
+    expect(en.d.isListening() || ja.d.isListening()).toBe(false);
+  });
+  it("Japanese speech only fills the box (text out, nothing submitted) and can be corrected before sending", () => {
+    const { d, text, rec } = setupLang(RECOGNITION_LANG.ja);
+    d.start();
+    rec().say([{ t: "ざる", final: true }]);
+    expect(text).toEqual([["ざる", true]]);
+  });
+  it("tells the student, in terms of the language, when the browser can't recognise it", () => {
+    expect(dictationErrorMessage("language-not-supported", true, RECOGNITION_LANG.ja)).toMatch(/Japanese/);
+    expect(dictationErrorMessage("language-not-supported", true, RECOGNITION_LANG.en)).toMatch(/English/);
+    const { d, errors, rec } = setupLang(RECOGNITION_LANG.ja);
+    d.start();
+    rec().onerror?.({ error: "language-not-supported" });
+    expect(errors[0]).toMatch(/Japanese.*Type your answer/);
+  });
+  it("there is no language toggle in the normal answer box; Japanese is reached only through the situation button", () => {
+    const src = readFileSync(new URL("../components/TakerRound.tsx", import.meta.url), "utf8");
+    expect(src).not.toMatch(/<select|role="switch"|English \/ Japanese|JP \/ EN/);
+    expect(src.match(/I know it, but not in English!/g)).toHaveLength(1);
+    expect(src.match(/setMode\("ja"\)/g)).toHaveLength(1); // the only way into the Japanese box
+  });
+  it("the hook passes the box's language to the recognition object and nothing else decides it", () => {
+    const src = readFileSync(new URL("../components/useDictation.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/\{ secure: window\.isSecureContext !== false, lang \}/);
+    expect(src).not.toMatch(/navigator\.language/);
+  });
 });

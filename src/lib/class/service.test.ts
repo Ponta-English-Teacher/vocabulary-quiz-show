@@ -184,7 +184,12 @@ describe("privacy (enforced by what the server sends)", () => {
     await g.act({ type: "REVEAL_HINT" });
     await t.poll();
     const json = JSON.stringify(t.view).toLowerCase();
-    for (const w of activity.words) for (const s of secretsOf(w)) expect(json, `leaked "${s}"`).not.toContain(s.toLowerCase());
+    // The Taker may see the hints that are showing (the free opening hint + the one revealed) and nothing else.
+    const shown = activity.words[5].hints.slice(0, 2);
+    for (const w of activity.words) for (const s of secretsOf(w)) {
+      if (shown.includes(s)) continue;
+      expect(json, `leaked "${s}"`).not.toContain(s.toLowerCase());
+    }
     expect(t.view!.game!.hintsUsed).toBe(1);
     const raw = JSON.stringify(await svc.getView({ activityId: activity.id, group: "7", token: t.token })).toLowerCase();
     expect(raw).not.toContain("reluctant");
@@ -250,7 +255,7 @@ describe("synchronised play", () => {
     await g.act({ type: "REVEAL_HINT" });
     await g.act({ type: "ADJUST_HINTS", delta: 1 });
     await t.poll();
-    expect(t.view!.game).toMatchObject({ hintsUsed: 2, revealedHints: 1 });
+    expect(t.view!.game).toMatchObject({ hintsUsed: 2, revealedHints: 2 }); // opening hint (free) + 1 revealed; 2 paid in all
     expect(giverWordOf(g).hints[0]).toBe(activity.words[0].hints[0]);
   });
   it("a wrong answer is visible to the Giver; the right one scores for both", async () => {
@@ -601,5 +606,223 @@ describe("finished words don't leak later answers (examples can mention other ta
       expect(w.example + w.meaning + w.hints.join("") + (w.accept ?? []).join("")).toBe("");
       expect(JSON.stringify(p.view).toLowerCase()).not.toContain("borrow your scissors");
     }
+  });
+});
+
+// ---- opening hint, Giver notes and Japanese answers over the classroom service --------------------------------
+
+describe("opening hint (classroom)", () => {
+  it("appears on both phones the moment the Giver picks a word, free, with no extra request", async () => {
+    const { activity, giverPhone: g, takerPhone: t } = await startGame();
+    await g.act({ type: "CONTINUE" });
+    await g.act({ type: "PICK", wordId: activity.words[0].id });
+    await t.poll();
+    for (const p of [g, t]) {
+      expect(p.view!.game).toMatchObject({ phase: "round", revealedHints: 1, hintsUsed: 0 });
+      expect(p.view!.game!.words[0].hints[0]).toBe(activity.words[0].hints[0]);
+    }
+    expect(t.view!.game!.words[0].hints[1]).toBe(""); // the optional hints stay hidden until revealed
+    expect(t.view!.game!.words[0].hints[2]).toBe("");
+  });
+  it("is free: answering at once in English earns 100, and an extra hint costs 15", async () => {
+    const free = await startGame();
+    await free.giverPhone.act({ type: "CONTINUE" });
+    await free.giverPhone.act({ type: "PICK", wordId: free.activity.words[0].id });
+    await free.takerPhone.act({ type: "GUESS", text: "umbrella" });
+    expect(free.takerPhone.view!.game!.lastResult).toMatchObject({ takerPoints: 100, giverPoints: 50, hintsUsed: 0 });
+
+    const paid = await startGame();
+    await paid.giverPhone.act({ type: "CONTINUE" });
+    await paid.giverPhone.act({ type: "PICK", wordId: paid.activity.words[0].id });
+    await paid.giverPhone.act({ type: "REVEAL_HINT" });
+    await paid.takerPhone.poll();
+    expect(paid.takerPhone.view!.game!.words[0].hints[1]).toBe(paid.activity.words[0].hints[1]); // shown on both phones once revealed
+    await paid.takerPhone.act({ type: "GUESS", text: "umbrella" });
+    expect(paid.takerPhone.view!.game!.lastResult).toMatchObject({ takerPoints: 85, giverPoints: 43, hintsUsed: 1 });
+  });
+});
+
+describe("Japanese answers (classroom)", () => {
+  const SHOWN_JA = ["傘", "かさ"];
+
+  async function roundOn(wordIndex = 0) {
+    const env = await startGame();
+    await env.giverPhone.act({ type: "CONTINUE" });
+    await env.giverPhone.act({ type: "PICK", wordId: env.activity.words[wordIndex].id });
+    await env.takerPhone.poll();
+    return env;
+  }
+
+  it("the Taker's phone never receives the Japanese answers or Giver notes before the round ends", async () => {
+    const { svc, activity, takerPhone: t, giverPhone: g } = await roundOn();
+    await g.act({ type: "REVEAL_HINT" });
+    await t.poll();
+    const info = activity.words[0].giverInfo!;
+    const raw = JSON.stringify(await svc.getView({ activityId: activity.id, group: "7", token: t.token }));
+    for (const body of [JSON.stringify(t.view), raw]) {
+      for (const s of SHOWN_JA) expect(body).not.toContain(s);
+      for (const s of [info.looks!, info.use!, ...info.phrases!]) expect(body).not.toContain(s);
+    }
+    // it only learns THAT Japanese credit exists (same number of empty placeholders)
+    expect(t.view!.game!.words[0].ja).toEqual(["", ""]);
+  });
+  it("the Giver does not receive the Japanese answers during the round either, but does get the notes", async () => {
+    const { activity, giverPhone: g } = await roundOn();
+    const json = JSON.stringify(g.view);
+    for (const s of SHOWN_JA) expect(json).not.toContain(s);
+    expect(giverWordOf(g).giverInfo).toEqual(activity.words[0].giverInfo);
+  });
+  it("only the Taker can submit a Japanese answer", async () => {
+    const { giverPhone: g, takerPhone: t } = await roundOn();
+    expect(await g.act({ type: "GUESS_JA", text: "傘" })).toMatchObject({ ok: false, code: "forbidden" });
+    expect(await t.act({ type: "GUESS_JA", text: "傘" })).toMatchObject({ ok: true, applied: true });
+  });
+  it("a correct Japanese answer scores half for the Taker and half of that for the Giver — identically on both phones", async () => {
+    const { giverPhone: g, takerPhone: t } = await roundOn();
+    await t.act({ type: "GUESS_JA", text: "ザルじゃなくて傘" }); // not an approved answer
+    await t.act({ type: "GUESS_JA", text: "傘です" });
+    await g.poll();
+    for (const p of [g, t]) {
+      expect(p.view!.game!.phase).toBe("reveal");
+      expect(p.view!.game!.lastResult).toMatchObject({ outcome: "solved", answeredIn: "ja", takerPoints: 50, giverPoints: 25, wrongGuesses: 1 });
+      expect(p.view!.game!.words[0].ja).toEqual(SHOWN_JA); // the Japanese meaning is shown on the answer screen
+    }
+    expect(t.view!.game!.players.map((p) => p.score).sort((a, b) => a - b)).toEqual([25, 50]);
+  });
+  it("a wrong Japanese answer keeps the round open and the Giver sees it was in Japanese", async () => {
+    const { giverPhone: g, takerPhone: t } = await roundOn();
+    await t.act({ type: "GUESS_JA", text: "かばん" });
+    await g.poll();
+    expect(g.view!.game).toMatchObject({ phase: "round", wrongGuesses: 1, feedback: { kind: "wrong", lang: "ja", guess: "かばん" } });
+    expect(await t.act({ type: "GUESS", text: "umbrella" })).toMatchObject({ applied: true });
+    expect(t.view!.game!.lastResult).toMatchObject({ answeredIn: "en", takerPoints: 100 });
+  });
+  it("a word with no approved Japanese equivalent gives no Japanese credit and the Taker is told", async () => {
+    const env = await setup();
+    const created = await env.svc.createActivity({
+      title: "No Japanese",
+      words: SAMPLE_SET.words.map(({ ja: _ja, giverInfo: _gi, ...w }) => { void _ja; void _gi; return w; }),
+    });
+    if (!created.ok) throw new Error("setup");
+    const a = env.phone("7", "Aki", created.activity.id), b = env.phone("7", "Ben", created.activity.id);
+    await a.join(); await b.join();
+    await a.act({ type: "PROPOSE_ROLES", giver: "me" }); await b.act({ type: "CONFIRM_ROLES" });
+    await a.act({ type: "CONTINUE" });
+    await a.act({ type: "PICK", wordId: created.activity.words[0].id });
+    await b.poll();
+    expect(b.view!.game!.words[0].ja).toEqual([]);
+    await b.act({ type: "GUESS_JA", text: "傘" });
+    expect(b.view!.game).toMatchObject({ phase: "round", wrongGuesses: 0, feedback: { kind: "no-ja-credit", lang: "ja" } });
+    expect(b.view!.game!.players.map((p) => p.score)).toEqual([0, 0]);
+  });
+  it("answers are matched on the server: the client cannot say whether it was right", async () => {
+    const { giverPhone: g, takerPhone: t } = await roundOn();
+    const forged = await t.act({ type: "GUESS_JA", text: "傘", correct: true, lang: "en" } as unknown as ClientAction);
+    expect(forged).toMatchObject({ applied: true }); // extra fields are ignored…
+    expect(t.view!.game!.lastResult?.answeredIn).toBe("ja"); // …and the server decided the language and the score
+    expect(await t.act({ type: "GUESS_JA", text: "x".repeat(500) })).toMatchObject({ ok: true, applied: false });
+    void g;
+  });
+});
+
+describe("duplicate and simultaneous answers (English + Japanese)", () => {
+  async function roundOn() {
+    const env = await startGame();
+    await env.giverPhone.act({ type: "CONTINUE" });
+    await env.giverPhone.act({ type: "PICK", wordId: env.activity.words[0].id });
+    return env;
+  }
+  it("an English and a Japanese correct answer sent at the same instant score exactly once", async () => {
+    for (let i = 0; i < 6; i++) {
+      const { giverPhone: g, takerPhone: t } = await roundOn();
+      await Promise.all([t.act({ type: "GUESS", text: "umbrella" }, "e"), t.act({ type: "GUESS_JA", text: "傘" }, "j"), t.act({ type: "GUESS_JA", text: "傘" }, "j")]);
+      await g.poll(); await t.poll();
+      const game = g.view!.game!;
+      expect(game.history).toHaveLength(1);
+      const r = game.lastResult!;
+      expect([[100, 50, "en"], [50, 25, "ja"]]).toContainEqual([r.takerPoints, r.giverPoints, r.answeredIn]);
+      expect(game.players.reduce((n, p) => n + p.score, 0)).toBe(r.takerPoints + r.giverPoints);
+      expect(t.view!.game!.players).toEqual(game.players);
+    }
+  });
+  it("a Japanese answer after a correct English answer (or the reverse) is ignored", async () => {
+    const { giverPhone: g, takerPhone: t } = await roundOn();
+    await t.act({ type: "GUESS", text: "umbrella" }, "first");
+    expect(await t.act({ type: "GUESS_JA", text: "傘" }, "second")).toMatchObject({ ok: true, applied: false });
+    await g.poll();
+    expect(g.view!.game!.lastResult).toMatchObject({ takerPoints: 100, answeredIn: "en" });
+    expect(g.view!.game!.history).toHaveLength(1);
+  });
+  it("a retried Japanese submission (same request id) is applied once", async () => {
+    const { giverPhone: g, takerPhone: t } = await roundOn();
+    expect(await t.act({ type: "GUESS_JA", text: "かばん" }, "r1")).toMatchObject({ applied: true });
+    expect(await t.act({ type: "GUESS_JA", text: "かばん" }, "r1")).toMatchObject({ applied: false });
+    await g.poll();
+    expect(g.view!.game!.wrongGuesses).toBe(1);
+  });
+});
+
+describe("full classroom game with English and Japanese answers", () => {
+  it("plays ten words with role switching and a reconnection; both phones show the same scores and winner", async () => {
+    const { activity, a, b, svc } = await startGame("a");
+    let expected: [number, number] = [0, 0];
+    for (let i = 0; i < 10; i++) {
+      await a.poll(); await b.poll();
+      const giver = a.view!.role === "giver" ? a : b, taker = giver === a ? b : a;
+      if (i === 4) { // Ben's phone reloads mid-game and recovers its seat with the saved token
+        const reloaded = new Phone(svc, activity.id, "7", "");
+        reloaded.token = b.token;
+        expect(await reloaded.join()).toMatchObject({ ok: true, rejoined: true });
+        b.view = reloaded.view;
+      }
+      await giver.act({ type: "CONTINUE" });
+      await giver.act({ type: "PICK", wordId: activity.words[i].id });
+      const extra = i % 3;
+      for (let h = 0; h < extra; h++) await giver.act({ type: "REVEAL_HINT" });
+      const inJapanese = i % 2 === 1;
+      if (inJapanese) await taker.act({ type: "GUESS_JA", text: activity.words[i].ja![0] });
+      else await taker.act({ type: "GUESS", text: activity.words[i].word });
+      const english = Math.max(25, 100 - 15 * extra);
+      const takerPts = inJapanese ? Math.round(english / 2) : english, giverPts = Math.round(takerPts / 2);
+      const takerSeat = taker === a ? 0 : 1;
+      expected = takerSeat === 0 ? [expected[0] + takerPts, expected[1] + giverPts] : [expected[0] + giverPts, expected[1] + takerPts];
+      await taker.act({ type: "NEXT" });
+    }
+    await a.poll(); await b.poll();
+    for (const p of [a, b]) {
+      expect(p.view!.game!.phase).toBe("final");
+      expect(p.view!.game!.players.map((x) => x.score)).toEqual(expected);
+      expect(p.view!.game!.history).toHaveLength(10);
+      expect(p.view!.game!.history.filter((h) => h.answeredIn === "ja")).toHaveLength(5);
+    }
+    // earlier words' Japanese answers are not sent again once their turn is over
+    expect(JSON.stringify(b.view)).not.toContain("傘");
+  });
+});
+
+describe("existing sets and published activities", () => {
+  it("a set saved before these features (no Japanese, no Giver notes) is published and played unchanged", async () => {
+    const env = await setup();
+    const legacy = SAMPLE_SET.words.map(({ ja: _ja, giverInfo: _gi, ...w }) => { void _ja; void _gi; return w; });
+    const created = await env.svc.createActivity({ title: "Legacy", words: legacy });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const a = env.phone("7", "Aki", created.activity.id), b = env.phone("7", "Ben", created.activity.id);
+    await a.join(); await b.join();
+    await a.act({ type: "PROPOSE_ROLES", giver: "me" }); await b.act({ type: "CONFIRM_ROLES" });
+    await a.act({ type: "CONTINUE" });
+    await a.act({ type: "PICK", wordId: legacy[0].id });
+    await b.act({ type: "GUESS", text: "umbrella" });
+    expect(b.view!.game!.lastResult).toMatchObject({ takerPoints: 100, giverPoints: 50, answeredIn: "en" });
+    expect(giverWordOf(a).giverInfo).toBeUndefined();
+  });
+  it("publishing keeps the approved Japanese answers and Giver notes, cleaned and de-duplicated", async () => {
+    const env = await setup();
+    const words = [{ ...SAMPLE_SET.words[0], ja: ["傘", "ｶｻ", "かさ", "ガサ ", "傘"], giverInfo: { looks: "  A  long handle. ", use: "", phrases: ["It has...", "", "You hold..."] } }];
+    const created = await env.svc.createActivity({ title: "Cleaned", words });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    expect(created.activity.words[0].ja).toEqual(["傘", "ｶｻ", "ガサ"]); // かさ/ｶｻ are the same once kana forms are folded
+    expect(created.activity.words[0].giverInfo).toEqual({ looks: "A long handle.", phrases: ["It has...", "You hold..."] });
   });
 });

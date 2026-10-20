@@ -35,6 +35,7 @@ export function ClassApp({ activityId }: { activityId: string }) {
     if (a.type === "PICK") return void s.act({ type: "PICK", wordId: a.wordId });
     if (a.type === "ADJUST_HINTS") return void s.act({ type: "ADJUST_HINTS", delta: a.delta });
     if (a.type === "GUESS") return void s.act({ type: "GUESS", text: a.text });
+    if (a.type === "GUESS_JA") return void s.act({ type: "GUESS_JA", text: a.text });
     const c = map[a.type];
     if (c) void s.act(c);
   };

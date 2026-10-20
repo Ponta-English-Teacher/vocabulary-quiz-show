@@ -31,18 +31,24 @@ ITEM RULES
 - "meaning": a clear definition in simple English, ideally without using the target word.
 - "example": one natural example sentence using the word.
 - "hints": EXACTLY three hints the Giver can say aloud. They must PROGRESS — each strictly more informative than the one before, and each a different KIND of clue:
-    hint 1 = situation: a specific scene, who uses it, when or where you meet it. Narrow enough to exclude most other words; NOT a generic line like "it is used in the kitchen" or "it is used for cooking".
+    hint 1 = the OPENING HINT. The app shows it to BOTH students automatically at the start of the round, and it is FREE, so the Taker starts asking questions at once. It must set a meaningful SITUATION: a specific scene, who uses it, when or where you meet it — one or two simple sentences. Narrow enough to exclude most other words; NEVER a generic label like "it is a kitchen tool", "it is used in the kitchen" or "it is used for cooking". Example for "colander": "You often need this after boiling pasta or washing vegetables."
     hint 2 = distinctive features: how it works, its shape or material, what it is usually combined with, a typical collocation, or a sentence with a blank (____).
     hint 3 = strongest clue: a contrast with a similar item ("unlike a ___, it ..."), a near-synonym or opposite, or a vivid sentence with a blank that only this word fits.
   A first-letter clue is allowed ONLY as an extra tacked onto hint 3 of at most one word in three, never as a hint on its own. NEVER write a hint that is just "The first letter is x", "It starts with x", or the number of words. Do not reuse the same hint pattern across items. A hint must NEVER contain the target word, its inflections, or any form in "accept".
 - For abstract words, use situations and examples the Giver can describe in words.
+- "looks", "use", "phrases" — GIVER NOTES, private support the Giver reads to understand the word and answer the Taker's questions in their own words (they never have to read it aloud). Adapt them to the kind of word:
+    objects: "looks" = what it looks like (shape, parts, material, size); "use" = how it is used, in two short sentences. Example for "colander": looks "It looks like a bowl with many small holes." use "You put pasta inside. The water goes out, but the pasta stays."
+    actions: "looks" = what you would SEE someone doing; "use" = when or why people do it. Emotions / abstract words / expressions: leave "looks" as an empty string; "use" = when people feel or say it, with a tiny situation.
+    "phrases" = 2 to 4 very short sentence starters the Giver can use, e.g. ["It looks like...", "You use it when...", "It has...", "You put ... inside."]; for actions or feelings use starters such as "You do this when...", "It is a feeling...".
+  Write them in plain, speakable English that is clearly EASIER than the target word (short sentences, everyday words, no rare vocabulary). Do not use the target word or its inflections in them (the Giver may not say it). Each line at most 25 words.
+- "ja": 1 to 6 approved JAPANESE EQUIVALENTS of the target, written as a Japanese student would answer: the everyday translation first, then common synonyms and the other common writings (kanji, hiragana). Example: "colander" → ["ざる", "水切りざる", "ストレーナー"]. Include ONLY words that genuinely mean the same thing — never merely related words (for "colander", not "鍋" or "料理"). These are matched exactly, with no fuzzy guessing, and the teacher will review them. If you are not confident of a correct Japanese equivalent, return an empty array rather than guessing.
 - "accept": alternative answers to accept (plurals, spelling variants, common inflections, short variants of a phrase). Empty array if none.
 - Vary the words; no duplicates; never repeat anything in the "avoid" list.
 - Ten is the size of one quiz set, not the size of the topic. Choose words that fit the teacher's scope and balance and that work well for interactive communication, not just the most obvious ten.
 
 HINTS — THE APP'S CONCEPT (be accurate about this)
 - The intended hint system has: spoken descriptions by the Giver; pictures and visual clues; situational examples; hints made up by the students themselves; and AI help when a Giver cannot explain a word.
-- Available TODAY: the three text hints you write (the Giver says them aloud), plus the Giver's own spoken hints, which the Giver counts by hand.
+- Available TODAY: the three text hints you write (hint 1 appears automatically and is free; hints 2 and 3 are optional and cost points when the Giver reveals them), plus the Giver's own spoken hints, which the Giver counts by hand. Talking and asking questions is always free.
 - Picture/visual hints are a planned FUTURE feature, NOT available yet. If asked, say pictures belong to the design but are not built yet; never claim they exist, never say hints must be verbal only, and never produce images or image links.
 Respond with a single JSON object only.`;
 
@@ -85,7 +91,7 @@ Reply as JSON: {"reply": string, "brief": {"topic": string, "level": "A1"|...|"C
   ];
 }
 
-const itemShape = `{"word": string, "accept": string[], "partOfSpeech": string, "cefr": string, "category": string, "meaning": string, "example": string, "hints": [string, string, string]}`;
+const itemShape = `{"word": string, "accept": string[], "partOfSpeech": string, "cefr": string, "category": string, "meaning": string, "example": string, "hints": [string, string, string], "looks": string, "use": string, "phrases": string[], "ja": string[]}`;
 
 /**
  * `count` is how many items to ask the model for; `needed` how many valid ones the app needs.

@@ -1,7 +1,7 @@
 import { CEFR_LEVELS } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
 import { EMPTY_BRIEF, MAX_SETS_PER_REQUEST, SET_SIZE, type Brief, type ChatMessage, type ChatResult, type StudioCommand } from "../types";
-import { normalizeCefr, leaksTarget } from "../validation";
+import { coerceGiverInfo, coerceJa, normalizeCefr, leaksTarget } from "../validation";
 import type { VocabWord } from "@/data/vocab";
 import { AiError, type StudioRequest } from "./types";
 
@@ -93,6 +93,8 @@ export function parseStudioRequest(body: unknown): StudioRequest {
       meaning: clip(v.meaning, 300),
       example: clip(v.example, 300),
       hints: strList(v.hints, 3, 200),
+      ...(coerceGiverInfo(v.giverInfo) ? { giverInfo: coerceGiverInfo(v.giverInfo) } : {}),
+      ...(coerceJa(v.ja).length ? { ja: coerceJa(v.ja) } : {}),
     };
   };
 

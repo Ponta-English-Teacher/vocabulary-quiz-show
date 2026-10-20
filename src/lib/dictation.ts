@@ -9,6 +9,14 @@
  *    (The browser's speech service — Google for Chrome, Apple for Safari — may process the audio to transcribe it.)
  */
 
+/**
+ * The recognition language is fixed by WHICH answer box the student is using — there is no language toggle:
+ * the normal English answer box always listens for English, and the "I know it, but not in English!" box
+ * always listens for Japanese.
+ */
+export const RECOGNITION_LANG = { en: "en-US", ja: "ja-JP" } as const;
+export type RecognitionLang = (typeof RECOGNITION_LANG)[keyof typeof RECOGNITION_LANG];
+
 export interface RecognitionResultLike {
   isFinal: boolean;
   0: { transcript: string };
@@ -56,7 +64,8 @@ export function checkDictationSupport(env: DictationEnv): DictationSupport {
 }
 
 /** A student-friendly message for a recognition error code (null = ignore, e.g. the student stopped it). */
-export function dictationErrorMessage(code: string, secure = true): string | null {
+export function dictationErrorMessage(code: string, secure = true, lang: RecognitionLang = RECOGNITION_LANG.en): string | null {
+  const language = lang === RECOGNITION_LANG.ja ? "Japanese" : "English";
   switch (code) {
     case "aborted":
       return null;
@@ -72,7 +81,7 @@ export function dictationErrorMessage(code: string, secure = true): string | nul
     case "network":
       return "Voice input needs an internet connection. Type your answer instead.";
     case "language-not-supported":
-      return "This browser can't recognise English speech. Type your answer instead.";
+      return `This browser can't recognise ${language} speech. Type your answer instead.`;
     default:
       return "Voice input didn't work. Type your answer instead.";
   }
@@ -94,7 +103,7 @@ export interface Dictation {
   isListening(): boolean;
 }
 
-export function createDictation(Ctor: RecognitionCtor, handlers: DictationHandlers, opts: { lang?: string; secure?: boolean } = {}): Dictation {
+export function createDictation(Ctor: RecognitionCtor, handlers: DictationHandlers, opts: { lang?: RecognitionLang; secure?: boolean } = {}): Dictation {
   let rec: RecognitionLike | null = null;
   let listening = false;
 
@@ -112,7 +121,7 @@ export function createDictation(Ctor: RecognitionCtor, handlers: DictationHandle
       try {
         const r = new Ctor(); // a fresh instance per press is the most reliable on iOS
         rec = r;
-        r.lang = opts.lang ?? "en-US";
+        r.lang = opts.lang ?? RECOGNITION_LANG.en;
         r.continuous = false; // one short answer, then it stops by itself
         r.interimResults = true;
         r.maxAlternatives = 1;
@@ -130,7 +139,7 @@ export function createDictation(Ctor: RecognitionCtor, handlers: DictationHandle
           handlers.onText(text.replace(/\s+/g, " ").trim(), final);
         };
         r.onerror = (e) => {
-          const msg = dictationErrorMessage(e.error, opts.secure ?? true);
+          const msg = dictationErrorMessage(e.error, opts.secure ?? true, opts.lang ?? RECOGNITION_LANG.en);
           if (msg) handlers.onError(msg);
           finish();
         };

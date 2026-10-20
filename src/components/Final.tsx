@@ -70,7 +70,7 @@ export function Final({ state, onAgain }: { state: GameState; onAgain: () => voi
           return (
             <li key={h.wordId} className={h.outcome === "skipped" ? "is-skipped" : ""}>
               <span>{w.word}</span>
-              <span>{h.outcome === "solved" ? `${state.players[h.taker].name} +${h.takerPoints}` : "skipped"}</span>
+              <span>{h.outcome === "solved" ? `${state.players[h.taker].name} +${h.takerPoints}${h.answeredIn === "ja" ? " (JP)" : ""}` : "skipped"}</span>
             </li>
           );
         })}

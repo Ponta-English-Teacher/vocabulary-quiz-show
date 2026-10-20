@@ -61,12 +61,14 @@ describe("teacher-approved set → game", () => {
     s = run([{ type: "PICK", wordId: vocab.words[5].id }, { type: "REVEAL_HINT" }], s);
     const json = JSON.stringify(redactForTaker(s)).toLowerCase();
     for (const w of vocab.words) {
-      for (const secret of [w.word, ...(w.accept ?? []), w.meaning, w.example, ...w.hints]) {
+      // The opening hint + the one revealed hint of the word in play are on screen (the fixture reuses hint texts across words).
+      const showing = vocab.words[5].hints.slice(0, 2);
+      for (const secret of [w.word, ...(w.accept ?? []), w.meaning, w.example, ...w.hints.filter((h) => !showing.includes(h))]) {
         expect(json, `leaked "${secret}"`).not.toContain(secret.toLowerCase());
       }
       expect(json).not.toContain(w.id.toLowerCase() + "-" + w.word); // ids are opaque
     }
-    expect(redactForTaker(s).revealedHints).toBe(1); // counts are fine, text is not
+    expect(redactForTaker(s).revealedHints).toBe(2); // counts are fine; only the revealed hints' text is shown
   });
   it("keeps the solved word visible to both after the round only", () => {
     const { vocab } = approvedSet();

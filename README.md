@@ -16,11 +16,26 @@ npm test
 ## Done vs. placeholder
 | Done | Placeholder |
 |---|---|
-| Welcome/names, 10-word sample set, word picker, Giver & Taker screens, hints + manual hint counter, answer checking, scoring, skip, role alternation, celebration/gentle-miss feedback, synthesised sounds, final winner/tie, demo-mode view switcher | Paired-phone sync (`createPairedTransport` in `src/lib/transport.ts` throws), set/category/CEFR picker UI, persistence, teacher tools |
+| Welcome (clearly separated classroom and demo modes), 10-word sample set, word picker, Giver & Taker screens, free opening hint, extra hints + manual hint counter, English and Japanese answers, scoring, skip, role alternation, celebration/gentle-miss feedback, synthesised sounds, final winner/tie, demo-mode view switcher, two-phone classroom mode, Teacher Studio | Picture hints, a set/category/CEFR picker for students |
 
-## Scoring (provisional — `src/lib/scoring.ts`)
-Taker = `max(25, 100 − 15 × hints)`; Giver = 50% of that; skip = 0; wrong guesses are free.
-Hints = revealed prepared hints + spoken hints added with **+**.
+## Scoring (`src/lib/scoring.ts`)
+- The **opening hint is free**: hint 1 appears on both screens automatically at the start of every round (prepared data — no AI call).
+- English answer = `max(25, 100 − 15 × extraHints)`. A correct **Japanese** answer (the "I know it, but not in English!" button) earns **half** of that. The Giver gets half of what the Taker was awarded. A skip = 0; wrong answers are free; a correct answer ends the round.
+- Extra hints = revealed hints 2 and 3 + spoken hints added with **+**. Questions and spoken answers are always free.
+- **Rounding rule:** halves round **up** (`Math.round`; 42.5 → 43), applied to each amount separately, so every score is an integer and identical on both phones.
+
+| extra hints | 0 | 1 | 2 | 3 | 4 | 5+ |
+|---|---|---|---|---|---|---|
+| Taker, English | 100 | 85 | 70 | 55 | 40 | 25 |
+| Taker, Japanese | 50 | 43 | 35 | 28 | 20 | 13 |
+| Giver, English | 50 | 43 | 35 | 28 | 20 | 13 |
+| Giver, Japanese | 25 | 22 | 18 | 14 | 10 | 7 |
+
+## Giver notes and Japanese answers
+Words may carry two optional extras (older saved sets simply don't have them and still play):
+- `giverInfo` — `looks`, `use`, `phrases`: private, easy English the Giver can use to answer questions (shown only on the Giver's screen).
+- `ja` — approved Japanese equivalents (max 8). A Japanese answer scores **only if it matches one of these** (`src/lib/japanese.ts`: hiragana/katakana, full/half-width, spaces, punctuation and polite endings are ignored; kanji spellings and synonyms must be listed; no fuzzy matching). Matching happens on the server; the answers are never sent to the Taker or the Giver while the word is in play, only shown on the answer screen. No `ja` = no Japanese credit (the student is told).
+- Teacher Studio generates both fields with the same AI call as the rest of the word (no per-round AI) and lets teachers edit them; the AI's Japanese is a draft to be checked.
 
 ## Layout
 - `src/data/vocab.ts` — editable vocabulary (`VocabSet`, per-word `category`, `cefr`; opaque ids)

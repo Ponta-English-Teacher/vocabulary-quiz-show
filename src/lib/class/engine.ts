@@ -109,12 +109,13 @@ export function parseAction(raw: unknown): ClientAction | null {
     case "PICK": return typeof a.wordId === "string" && a.wordId.length < 60 ? { type: "PICK", wordId: a.wordId } : null;
     case "ADJUST_HINTS": return a.delta === 1 || a.delta === -1 ? { type: "ADJUST_HINTS", delta: a.delta } : null;
     case "GUESS": return typeof a.text === "string" ? { type: "GUESS", text: a.text.slice(0, 100) } : null;
+    case "GUESS_JA": return typeof a.text === "string" ? { type: "GUESS_JA", text: a.text.slice(0, 100) } : null;
     default: return null;
   }
 }
 
 function permission(action: ClientAction, role: SeatRole | null): Fail | null {
-  const need: Partial<Record<ClientAction["type"], SeatRole>> = { PICK: "giver", REVEAL_HINT: "giver", ADJUST_HINTS: "giver", GUESS: "taker" };
+  const need: Partial<Record<ClientAction["type"], SeatRole>> = { PICK: "giver", REVEAL_HINT: "giver", ADJUST_HINTS: "giver", GUESS: "taker", GUESS_JA: "taker" };
   const lobbyOnly = ["PROPOSE_ROLES", "CONFIRM_ROLES", "LEAVE"];
   if (role === null) {
     if (!lobbyOnly.includes(action.type)) return fail("bad_action", "The game hasn't started yet.");
@@ -123,7 +124,7 @@ function permission(action: ClientAction, role: SeatRole | null): Fail | null {
   if (lobbyOnly.includes(action.type)) return fail("bad_action", "The game has already started.");
   const required = need[action.type];
   if (required && required !== role) {
-    return fail("forbidden", action.type === "GUESS" ? "Only the Taker can answer." : "Only the Giver can do that.");
+    return fail("forbidden", action.type === "GUESS" || action.type === "GUESS_JA" ? "Only the Taker can answer." : "Only the Giver can do that.");
   }
   return null;
 }
@@ -160,6 +161,7 @@ function gameAction(room: Room, action: ClientAction): boolean {
     case "REVEAL_HINT": mapped = { type: "REVEAL_HINT" }; break;
     case "ADJUST_HINTS": mapped = { type: "ADJUST_HINTS", delta: action.delta }; break;
     case "GUESS": mapped = { type: "GUESS", text: action.text }; break;
+    case "GUESS_JA": mapped = { type: "GUESS_JA", text: action.text }; break;
     case "SKIP": mapped = { type: "SKIP" }; break;
     case "NEXT": mapped = { type: "NEXT" }; break;
     case "CONTINUE": mapped = { type: "CONTINUE" }; break;

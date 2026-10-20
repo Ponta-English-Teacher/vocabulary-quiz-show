@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { checkDictationSupport, createDictation, getRecognitionCtor, type Dictation, type DictationEnv } from "@/lib/dictation";
+import { checkDictationSupport, createDictation, getRecognitionCtor, RECOGNITION_LANG, type Dictation, type DictationEnv, type RecognitionLang } from "@/lib/dictation";
 import { stopSpeaking } from "@/lib/speech";
 
-/** Press-to-talk dictation for one text field. `onText` receives the recognised words; it never submits anything. */
-export function useDictation(onText: (text: string, final: boolean) => void) {
+/**
+ * Press-to-talk dictation for one text field. `onText` receives the recognised words; it never submits anything.
+ * `lang` is fixed for the lifetime of the field (English box → en-US, Japanese box → ja-JP).
+ */
+export function useDictation(onText: (text: string, final: boolean) => void, lang: RecognitionLang = RECOGNITION_LANG.en) {
   const [listening, setListening] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const dictation = useRef<Dictation | null>(null);
@@ -23,12 +26,12 @@ export function useDictation(onText: (text: string, final: boolean) => void) {
       dictation.current = createDictation(
         getRecognitionCtor(env())!,
         { onText: (t, f) => onTextRef.current(t, f), onListening: setListening, onError: setMessage },
-        { secure: window.isSecureContext !== false },
+        { secure: window.isSecureContext !== false, lang },
       );
     }
     stopSpeaking(); // don't let the phone's own voice be picked up as the answer
     dictation.current.start();
-  }, []);
+  }, [lang]);
 
   const abort = useCallback(() => dictation.current?.abort(), []);
 
