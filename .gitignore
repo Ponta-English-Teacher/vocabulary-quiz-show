@@ -1,0 +1,23 @@
+# dependencies and build output
+node_modules
+.next
+out
+next-env.d.ts
+*.tsbuildinfo
+
+# environment files and secrets (keep .env.example, which has no values)
+.env
+.env.*
+!.env.example
+
+# logs, temp and OS files
+*.log
+npm-debug.log*
+.DS_Store
+*.tmp.*
+coverage
+.vercel
+
+# iCloud Drive conflict copies, e.g. "file 2.ts"
+* [0-9].*
+* [0-9]
