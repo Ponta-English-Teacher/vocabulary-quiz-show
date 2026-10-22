@@ -320,13 +320,13 @@ describe("one answer scores once", () => {
 });
 
 describe("what the Taker's view contains", () => {
-  it("shows the opening hint and revealed hints, hides the rest, and exposes no Japanese text", () => {
+  it("hides the opening hint (Giver only), shows only EXTRA hints the Giver reveals, and exposes no Japanese text", () => {
     let s = pick("umbrella");
     let view = redactForTaker(s);
     const w = view.words.find((x) => x.id === id("umbrella"))!;
-    expect(w.hints).toEqual([DEFAULT_SET.words[0].hints[0], "", ""]);
+    expect(w.hints).toEqual(["", "", ""]);
     s = run([{ type: "REVEAL_HINT" }], s);
-    expect(redactForTaker(s).words.find((x) => x.id === id("umbrella"))!.hints).toEqual([DEFAULT_SET.words[0].hints[0], DEFAULT_SET.words[0].hints[1], ""]);
+    expect(redactForTaker(s).words.find((x) => x.id === id("umbrella"))!.hints).toEqual(["", DEFAULT_SET.words[0].hints[1], ""]);
     view = redactForTaker(s);
     const json = JSON.stringify(view);
     expect(json).not.toContain("傘");

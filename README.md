@@ -19,7 +19,7 @@ npm test
 | Welcome (clearly separated classroom and demo modes), 10-word sample set, word picker, Giver & Taker screens, free opening hint, extra hints + manual hint counter, English and Japanese answers, scoring, skip, role alternation, celebration/gentle-miss feedback, synthesised sounds, final winner/tie, demo-mode view switcher, two-phone classroom mode, Teacher Studio | Picture hints, a set/category/CEFR picker for students |
 
 ## Scoring (`src/lib/scoring.ts`)
-- The **opening hint is free**: hint 1 appears on both screens automatically at the start of every round (prepared data — no AI call).
+- The **opening hint is free**: hint 1 appears automatically on the **Giver's screen only** at the start of every round (prepared data — no AI call). The Taker never receives it (the server strips it from their view, and demo mode's Taker screen uses the same redaction); the Taker is told to "Ask your partner questions to find out the word". Extra hints the Giver reveals still appear on both screens.
 - English answer = `max(25, 100 − 15 × extraHints)`. A correct **Japanese** answer (the "I know it, but not in English!" button) earns **half** of that. The Giver gets half of what the Taker was awarded. A skip = 0; wrong answers are free; a correct answer ends the round.
 - Extra hints = revealed hints 2 and 3 + spoken hints added with **+**. Questions and spoken answers are always free.
 - **Rounding rule:** halves round **up** (`Math.round`; 42.5 → 43), applied to each amount separately, so every score is an integer and identical on both phones.

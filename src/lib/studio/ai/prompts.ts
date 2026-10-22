@@ -31,7 +31,7 @@ ITEM RULES
 - "meaning": a clear definition in simple English, ideally without using the target word.
 - "example": one natural example sentence using the word.
 - "hints": EXACTLY three hints the Giver can say aloud. They must PROGRESS — each strictly more informative than the one before, and each a different KIND of clue:
-    hint 1 = the OPENING HINT. The app shows it to BOTH students automatically at the start of the round, and it is FREE, so the Taker starts asking questions at once. It must set a meaningful SITUATION: a specific scene, who uses it, when or where you meet it — one or two simple sentences. Narrow enough to exclude most other words; NEVER a generic label like "it is a kitchen tool", "it is used in the kitchen" or "it is used for cooking". Example for "colander": "You often need this after boiling pasta or washing vegetables."
+    hint 1 = the OPENING HINT. The app shows it automatically to the GIVER ONLY (the Taker never sees it) at the start of the round, and it is FREE; the Giver uses it to start explaining in their own English while the Taker asks questions to find the word. It must set a meaningful SITUATION: a specific scene, who uses it, when or where you meet it — one or two simple sentences. Narrow enough to exclude most other words; NEVER a generic label like "it is a kitchen tool", "it is used in the kitchen" or "it is used for cooking". Example for "colander": "You often need this after boiling pasta or washing vegetables."
     hint 2 = distinctive features: how it works, its shape or material, what it is usually combined with, a typical collocation, or a sentence with a blank (____).
     hint 3 = strongest clue: a contrast with a similar item ("unlike a ___, it ..."), a near-synonym or opposite, or a vivid sentence with a blank that only this word fits.
   A first-letter clue is allowed ONLY as an extra tacked onto hint 3 of at most one word in three, never as a hint on its own. NEVER write a hint that is just "The first letter is x", "It starts with x", or the number of words. Do not reuse the same hint pattern across items. A hint must NEVER contain the target word, its inflections, or any form in "accept".
@@ -48,7 +48,7 @@ ITEM RULES
 
 HINTS — THE APP'S CONCEPT (be accurate about this)
 - The intended hint system has: spoken descriptions by the Giver; pictures and visual clues; situational examples; hints made up by the students themselves; and AI help when a Giver cannot explain a word.
-- Available TODAY: the three text hints you write (hint 1 appears automatically and is free; hints 2 and 3 are optional and cost points when the Giver reveals them), plus the Giver's own spoken hints, which the Giver counts by hand. Talking and asking questions is always free.
+- Available TODAY: the three text hints you write (hint 1 appears automatically to the Giver only and is free; hints 2 and 3 are optional and cost points when the Giver reveals them), plus the Giver's own spoken hints, which the Giver counts by hand. Talking and asking questions is always free.
 - Picture/visual hints are a planned FUTURE feature, NOT available yet. If asked, say pictures belong to the design but are not built yet; never claim they exist, never say hints must be verbal only, and never produce images or image links.
 Respond with a single JSON object only.`;
 

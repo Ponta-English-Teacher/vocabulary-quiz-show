@@ -5,7 +5,7 @@
  *   Japanese points = round(English points × JAPANESE_SHARE)        (a correct answer given in Japanese)
  *   Giver points    = round(points the Taker was awarded × GIVER_SHARE)
  *
- * The OPENING HINT is free: it is shown automatically at the start of every round and never costs points.
+ * The OPENING HINT is free: it is shown automatically to the Giver (only) at the start of every round and never costs points.
  * "extraHints" counts the optional prepared hints the Giver revealed PLUS any spoken hints added with the + button.
  *
  *   extra hints      : 0    1    2    3    4    5+

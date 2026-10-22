@@ -58,7 +58,7 @@ export interface GameState {
   giver: PlayerIndex;
   statuses: Record<string, WordStatus>;
   currentWordId: string | null;
-  /** How many prepared hints are showing for the current word. The free opening hint is showing from the start. */
+  /** How many prepared hints are showing for the current word. The free opening hint is showing from the start — to the GIVER only. */
   revealedHints: number;
   /** PAID hints: extra prepared hints revealed + spoken hints added by hand. The opening hint never counts. */
   hintsUsed: number;
@@ -209,7 +209,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         phase: "round",
         currentWordId: action.wordId,
-        // The opening hint is on screen from the first moment and is free (it is prepared data — no AI call).
+        // The opening hint is on the GIVER's screen from the first moment and is free (prepared data — no AI call).
         revealedHints: Math.min(FREE_HINTS, picked?.hints.length ?? 0),
         hintsUsed: 0,
         illustrationUsed: false,
@@ -323,8 +323,9 @@ export function redactForTaker(state: GameState): GameState {
       accept: [],
       meaning: "",
       example: "",
-      // The hints the Giver has revealed (the free opening hint included) are on both screens; the rest stay blank.
-      hints: w.hints.map((h, i) => (inPlay && i < state.revealedHints ? h : "")),
+      // The OPENING hint (index < FREE_HINTS) is the Giver's alone: the Taker must find the word by asking questions.
+      // Only the extra hints the Giver has chosen to reveal reach the Taker; everything else stays blank.
+      hints: w.hints.map((h, i) => (inPlay && i >= FREE_HINTS && i < state.revealedHints ? h : "")),
       // Same length, empty text: the Taker's phone can tell whether Japanese credit exists, never what the answers are.
       ja: (w.ja ?? []).map(() => ""),
       giverInfo: undefined,

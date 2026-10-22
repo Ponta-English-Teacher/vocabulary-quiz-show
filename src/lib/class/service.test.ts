@@ -612,15 +612,14 @@ describe("finished words don't leak later answers (examples can mention other ta
 // ---- opening hint, Giver notes and Japanese answers over the classroom service --------------------------------
 
 describe("opening hint (classroom)", () => {
-  it("appears on both phones the moment the Giver picks a word, free, with no extra request", async () => {
+  it("appears on the GIVER's phone only, the moment a word is picked, free, with no extra request", async () => {
     const { activity, giverPhone: g, takerPhone: t } = await startGame();
     await g.act({ type: "CONTINUE" });
     await g.act({ type: "PICK", wordId: activity.words[0].id });
     await t.poll();
-    for (const p of [g, t]) {
-      expect(p.view!.game).toMatchObject({ phase: "round", revealedHints: 1, hintsUsed: 0 });
-      expect(p.view!.game!.words[0].hints[0]).toBe(activity.words[0].hints[0]);
-    }
+    for (const p of [g, t]) expect(p.view!.game).toMatchObject({ phase: "round", revealedHints: 1, hintsUsed: 0 });
+    expect(g.view!.game!.words[0].hints[0]).toBe(activity.words[0].hints[0]);
+    expect(t.view!.game!.words[0].hints[0]).toBe(""); // the Taker finds the word by asking questions
     expect(t.view!.game!.words[0].hints[1]).toBe(""); // the optional hints stay hidden until revealed
     expect(t.view!.game!.words[0].hints[2]).toBe("");
   });

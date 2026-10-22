@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { currentWord, type Feedback, type GameAction, type GameState } from "@/lib/game";
 import { RECOGNITION_LANG } from "@/lib/dictation";
-import { takerPointsFor } from "@/lib/scoring";
+import { FREE_HINTS, takerPointsFor } from "@/lib/scoring";
 import { PointsMeter } from "./PointsMeter";
 import { useDictation } from "./useDictation";
 import { SkipButton } from "./SkipButton";
@@ -64,8 +64,8 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
 
   if (!word) return null;
   const taker = state.players[state.giver === 0 ? 1 : 0].name;
-  // The hints the Giver has revealed. The first one is the free opening hint and is there from the start of the round.
-  const shownHints = word.hints.slice(0, state.revealedHints).filter(Boolean);
+  // Only the EXTRA hints the Giver chose to reveal. The opening hint is the Giver's alone (the server never sends it here).
+  const shownHints = word.hints.map((h, n) => ({ h, n })).filter((x) => x.n >= FREE_HINTS && x.n < state.revealedHints && x.h);
   const hasJapanese = (word.ja ?? []).length > 0; // the Taker only learns THAT a Japanese answer exists, never what it is
   const jaPoints = takerPointsFor(state.hintsUsed, "ja", state.illustrationUsed);
 
@@ -96,9 +96,9 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
 
       {shownHints.length > 0 ? (
         <section className="clues" aria-label="Hints" aria-live="polite">
-          {shownHints.map((h, i) => (
-            <p key={i} className={`clue ${i === 0 ? "clue--opening" : ""}`}>
-              <span className="clue__tag">{i === 0 ? "Opening hint · free" : `Extra hint ${i}`}</span>
+          {shownHints.map(({ h, n }) => (
+            <p key={n} className="clue">
+              <span className="clue__tag">{`Extra hint ${n}`}</span>
               <span className="clue__text">{h}</span>
             </p>
           ))}
@@ -107,6 +107,7 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
 
       <section className="ask">
         <h3 className="label">Ask your partner — out loud!</h3>
+        <p className="note ask__task">Ask your partner questions to find out the word.</p>
         <button type="button" className="ask__prompt" onClick={() => setTip((t) => (t + 1) % QUESTION_STARTERS.length)}>
           “{QUESTION_STARTERS[tip]}”
           <span className="ask__more">tap for another idea</span>

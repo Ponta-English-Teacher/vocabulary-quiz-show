@@ -101,7 +101,7 @@ export function Welcome({
       </div>
 
       <ol className="howto">
-        <li><span><b>Giver</b> sees the word and explains it — out loud, never reading it. The opening hint is free.</span></li>
+        <li><span><b>Giver</b> sees the word and an opening hint (free, Giver only) and explains it — out loud, in their own words, never reading it.</span></li>
         <li><span><b>Taker</b> asks as many questions as they like, then types or says a guess. Know it but not in English? Answer in Japanese for half the points.</span></li>
         <li><span>Extra hints cost points. Swap roles after every word.</span></li>
       </ol>

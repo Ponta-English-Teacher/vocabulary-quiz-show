@@ -105,7 +105,7 @@ export const isLetterOnlyHint = (h: string): boolean => LETTER_ONLY.some((r) => 
 const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
 /**
- * The OPENING hint is shown to both players automatically, so it must set a real scene (who, when, where) —
+ * The OPENING hint is shown automatically to the Giver (not the Taker), who uses it to start explaining, so it must set a real scene (who, when, where) —
  * not a label such as "It is a kitchen tool." These patterns catch the generic ones only.
  */
 const VAGUE_OPENING: RegExp[] = [
@@ -153,7 +153,7 @@ export function validateWord(w: VocabWord): WordIssue[] {
     }
   });
   if (w.hints[0]?.trim() && isVagueOpeningHint(w.hints[0])) {
-    warn("hints", "Hint 1 is shown to both players automatically for free — make it a real situation (who, when, where), not just a label like “it is a kitchen tool”.", 0, "vague-opening");
+    warn("hints", "Hint 1 is shown to the Giver automatically for free — make it a real situation (who, when, where), not just a label like “it is a kitchen tool”.", 0, "vague-opening");
   }
   if (new Set(w.hints.map(normalize)).size < w.hints.filter((h) => h.trim()).length) warn("hints", "Two hints are identical.");
 

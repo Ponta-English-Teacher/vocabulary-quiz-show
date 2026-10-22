@@ -57,10 +57,10 @@ export function GiverRound({
       {opening ? (
         <section className="clues" aria-label="Opening hint">
           <p className="clue clue--opening">
-            <span className="clue__tag">Opening hint · free · {state.players[state.giver === 0 ? 1 : 0].name} can see it</span>
+            <span className="clue__tag">Opening hint · free · only you can see it</span>
             <span className="clue__text">{opening}</span>
           </p>
-          <p className="note">Start from here. Your partner asks questions — answer them in English. Talking is always free.</p>
+          <p className="note">Use this to start explaining the word in your own English. {state.players[state.giver === 0 ? 1 : 0].name} can&apos;t see it and asks questions to find out the word. Talking is always free.</p>
         </section>
       ) : null}
 

@@ -42,7 +42,7 @@ export interface VocabWord {
   /** Example sentence for the Giver (may contain the word). */
   example: string;
   /**
-   * Prepared hints. Hint 1 is the OPENING hint: it is shown to both players automatically when the round
+   * Prepared hints. Hint 1 is the OPENING hint: it is shown to the GIVER only (never the Taker) automatically when the round
    * starts and is free. Hints 2 and 3 are optional and cost points. None of them contain the word.
    */
   hints: string[];
