@@ -1,4 +1,5 @@
 import type { VocabWord } from "@/data/vocab";
+import { normalize } from "@/lib/answer";
 import { clearPasscode, teacherHeaders } from "@/lib/teacher/client";
 import { parseGeneratedWords } from "../validation";
 import type { AiMode, StudioData, StudioRequest, StudioResponse } from "./types";
@@ -45,11 +46,28 @@ export async function callStudio<T extends StudioData["task"]>(
   if (!body.ok) throw new StudioClientError(body.error.message);
   if (body.data.task !== task) throw new StudioClientError("Unexpected response from the Studio server.");
 
-  // Defence in depth: re-validate generated vocabulary in the browser too.
+  // Defence in depth: re-validate generated vocabulary in the browser too — with the SAME rule as the server. A word the teacher approved
+  // is never thrown away here: if its hints fail the check it is kept (and flagged); if the browser must reject it for any other
+  // reason it is reported as failed, with the reason. The server's own `failed` / `flagged` lists are always passed on.
   if (body.data.task === "generate") {
     const exclude = "exclude" in req ? (req.exclude as string[]) : [];
-    const parsed = parseGeneratedWords(body.data.words, { exclude });
-    body.data = { task: "generate", words: parsed.words as VocabWord[], issues: [...body.data.issues, ...parsed.issues], requested: body.data.requested };
+    const approved = "approved" in req ? ((req.approved as string[] | undefined) ?? []) : [];
+    const server = body.data;
+    const parsed = parseGeneratedWords(server.words, { exclude, keepHintFlaws: true });
+    const kept = new Set(parsed.words.map((w) => normalize(w.word)));
+    const failed = [...(server.failed ?? [])];
+    for (const w of server.words) {
+      if (kept.has(normalize(w.word)) || !approved.some((a) => normalize(a) === normalize(w.word))) continue;
+      if (!failed.some((f) => normalize(f.word) === normalize(w.word))) {
+        failed.push({ word: w.word, reason: parsed.rejected.find((r) => normalize(r.word) === normalize(w.word))?.reason ?? "The item was rejected when it was checked in the browser." });
+      }
+    }
+    const flagged = [...(server.flagged ?? []).filter((f) => kept.has(normalize(f.word)))];
+    for (const f of parsed.flawed) if (!flagged.some((x) => normalize(x.word) === normalize(f.word))) flagged.push(f);
+    body.data = {
+      task: "generate", words: parsed.words as VocabWord[], issues: [...server.issues, ...parsed.issues], requested: server.requested,
+      ...(failed.length ? { failed } : {}), ...(flagged.length ? { flagged } : {}),
+    };
   }
   return { mode: body.mode, data: body.data as Extract<StudioData, { task: T }> };
 }
