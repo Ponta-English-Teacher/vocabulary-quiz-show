@@ -9,7 +9,10 @@ export async function requestIllustration(word: VocabWord): Promise<{ ok: true; 
   void _ignored;
   try {
     const res = await fetch("/api/studio/illustrate", { method: "POST", headers: { "Content-Type": "application/json", ...teacherHeaders() }, body: JSON.stringify({ word: plain }) });
-    if (res.status === 401) clearPasscode();
+    if (res.status === 401) {
+      clearPasscode();
+      return { ok: false, message: "Unlock the teacher tools on the start screen to draw illustrations." };
+    }
     const j = (await res.json()) as { ok?: boolean; illustration?: unknown; error?: { message?: string } };
     const ill = j.ok ? coerceIllustration(j.illustration) : undefined;
     if (ill) return { ok: true, illustration: ill };

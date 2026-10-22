@@ -41,4 +41,4 @@ export type ClientAction =
 
 export type ErrorCode =
   | "no_activity" | "no_room" | "bad_group" | "bad_name" | "full"
-  | "unauthorized" | "forbidden" | "bad_action" | "bad_request" | "busy" | "unavailable";
+  | "unauthorized" | "forbidden" | "bad_action" | "bad_request" | "busy" | "unavailable" | "picture_failed";

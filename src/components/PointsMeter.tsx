@@ -7,9 +7,9 @@ import { useCountUp } from "@/lib/hooks";
  * Live "this word is worth N points" readout that ticks down as EXTRA hints are used (the opening hint is free).
  * `showJapanese` adds the half-value a correct Japanese answer would earn.
  */
-export function PointsMeter({ hintsUsed, showJapanese = false }: { hintsUsed: number; showJapanese?: boolean }) {
-  const english = takerPointsFor(hintsUsed, "en");
-  const japanese = takerPointsFor(hintsUsed, "ja");
+export function PointsMeter({ hintsUsed, showJapanese = false, illustration = false }: { hintsUsed: number; showJapanese?: boolean; illustration?: boolean }) {
+  const english = takerPointsFor(hintsUsed, "en", illustration);
+  const japanese = takerPointsFor(hintsUsed, "ja", illustration);
   const shown = useCountUp(english, 500);
   return (
     <div className="worth" aria-live="polite">
@@ -21,6 +21,7 @@ export function PointsMeter({ hintsUsed, showJapanese = false }: { hintsUsed: nu
           · <b>{japanese}</b> if answered in Japanese
         </span>
       ) : null}
+      {illustration ? <span className="worth__ja">· illustration used</span> : null}
     </div>
   );
 }

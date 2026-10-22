@@ -67,7 +67,7 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
   // The hints the Giver has revealed. The first one is the free opening hint and is there from the start of the round.
   const shownHints = word.hints.slice(0, state.revealedHints).filter(Boolean);
   const hasJapanese = (word.ja ?? []).length > 0; // the Taker only learns THAT a Japanese answer exists, never what it is
-  const jaPoints = takerPointsFor(state.hintsUsed, "ja");
+  const jaPoints = takerPointsFor(state.hintsUsed, "ja", state.illustrationUsed);
 
   const openJapanese = () => {
     micEn.abort();
@@ -88,7 +88,7 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
         <h2 className="mystery" aria-label="Mystery word, hidden">
           <span>?</span><span>?</span><span>?</span><span>?</span><span>?</span>
         </h2>
-        <PointsMeter hintsUsed={state.hintsUsed} showJapanese={hasJapanese} />
+        <PointsMeter hintsUsed={state.hintsUsed} showJapanese={hasJapanese} illustration={state.illustrationUsed} />
         <p className="note">
           {state.hintsUsed === 0 ? "Questions are free — ask as many as you like." : `${state.hintsUsed} extra hint${state.hintsUsed === 1 ? "" : "s"} used`}
         </p>

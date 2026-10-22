@@ -224,5 +224,28 @@ export function useClassSession(activityId: string) {
     [activityId, apply, endSession],
   );
 
-  return { status, title, view, connection, error, busy, join, act };
+  /**
+   * The Giver's "I need an illustration". The server checks the role and decides the word; the picture and the score
+   * change come back in the view. Polling and the rest of the game carry on while it is being drawn.
+   */
+  const requestIllustration = useCallback(async (): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const s = session.current;
+    if (!s) return { ok: false, message: "Please join the group again." };
+    const r = await request(`/api/class/${activityId}/illustration`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.token}` },
+      body: JSON.stringify({ group: s.group }),
+      timeoutMs: 115_000,
+    });
+    if (r.network) return { ok: false, message: "Couldn't reach the server. Your score is unchanged." };
+    if (r.status === 401) {
+      endSession("Your session has ended. Please join again.");
+      return { ok: false, message: "Your session has ended." };
+    }
+    if (!r.body?.ok) return { ok: false, message: (r.body?.error?.message as string) ?? "The illustration couldn't be made. Your score is unchanged." };
+    if (r.body.view) apply(r.body.view as ClassView);
+    return { ok: true };
+  }, [activityId, apply, endSession]);
+
+  return { status, title, view, connection, error, busy, join, act, requestIllustration };
 }

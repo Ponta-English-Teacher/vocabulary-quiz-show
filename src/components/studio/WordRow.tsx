@@ -209,7 +209,7 @@ export function WordRow(p: WordRowProps) {
             ) : (
               <p className="note">No picture yet. The word is playable without one.</p>
             )}
-            <p className="note">Only the Giver sees this, from the start of the round. It is not a hint and costs no points.</p>
+            <p className="note">Kept ready for play. The Giver is NOT shown it automatically: they can ask for it as a last-resort hint (“I need an illustration”), which caps that word at 25 points. A picture made here is reused, so nothing is drawn twice.</p>
             <div className="row row--left">
               <button type="button" className="btn btn--small btn--ghost" disabled={p.disabled} onClick={p.onIllustrate}>
                 {w.illustration ? "Draw a new picture (AI)" : "Draw picture (AI)"}

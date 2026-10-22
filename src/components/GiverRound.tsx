@@ -9,8 +9,18 @@ import { useCanSpeak } from "@/lib/useSpeech";
 import { SpeakButton } from "./SpeakButton";
 import { PointsMeter } from "./PointsMeter";
 import { SkipButton } from "./SkipButton";
+import { GiverPicture, IllustrationRequest, type RequestResult } from "./IllustrationHint";
 
-export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a: GameAction) => void }) {
+export function GiverRound({
+  state,
+  dispatch,
+  onRequestIllustration,
+}: {
+  state: GameState;
+  dispatch: (a: GameAction) => void;
+  /** Asks for the illustration of the word in play. Classroom: the server decides, draws and applies the score cap. */
+  onRequestIllustration?: () => Promise<RequestResult>;
+}) {
   const word = currentWord(state);
   const canSpeak = useCanSpeak();
   // Stop any playback when this screen goes away (new word, role switch, leaving).
@@ -54,13 +64,7 @@ export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a
         </section>
       ) : null}
 
-      {word.illustration?.src ? (
-        <figure className="giver-pic">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={word.illustration.src} alt={word.illustration.alt ?? "Picture of the word (for you only)"} />
-          <figcaption className="note">Picture — only you can see this. Not a hint: no points lost.</figcaption>
-        </figure>
-      ) : null}
+      <GiverPicture used={state.illustrationUsed} illustration={word.illustration} />
 
       <section className="meaning">
         <h3 className="label">Meaning</h3>
@@ -90,7 +94,7 @@ export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a
       <section className="hints" aria-label="Hints">
         <div className="hints__head">
           <h3 className="label">Extra hints</h3>
-          <PointsMeter hintsUsed={state.hintsUsed} />
+          <PointsMeter hintsUsed={state.hintsUsed} illustration={state.illustrationUsed} />
         </div>
 
         <div className="counter">
@@ -145,6 +149,8 @@ export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a
           })}
         </ol>
       </section>
+
+      {!state.illustrationUsed && onRequestIllustration ? <IllustrationRequest onRequest={onRequestIllustration} /> : null}
 
       <p className="taker-watch" aria-live="polite">
         {fb && (fb.kind === "wrong" || fb.kind === "close")

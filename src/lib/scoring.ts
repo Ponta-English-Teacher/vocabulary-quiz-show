@@ -19,6 +19,10 @@
  * points the Taker actually received (not from the unrounded value), the result is deterministic and identical on
  * both phones.
  *
+ * ILLUSTRATION (a last-resort hint): once the Giver has been shown the picture, the word is worth at most
+ * ILLUSTRATION_MAX points in English (25) and half of that in Japanese (13), however many text hints were used.
+ * The Giver still gets half of what the Taker is awarded (13 / 7), with the same rounding rule.
+ *
  * - A skipped word scores 0 for both players.
  * - Wrong answers (English or Japanese) cost nothing: we want students to keep trying.
  * - A correct answer ends the round, so a word can never be scored twice.
@@ -29,6 +33,8 @@ export const SCORING = {
   FLOOR: 25,
   GIVER_SHARE: 0.5,
   JAPANESE_SHARE: 0.5,
+  /** The most a word can be worth (English) once its illustration has been shown. */
+  ILLUSTRATION_MAX: 25,
 } as const;
 
 /** Hints that are shown automatically at the start of a round and are free. */
@@ -43,8 +49,8 @@ export function pointsForHints(extraHints: number): number {
 }
 
 /** Points a Taker earns for a correct answer in `lang`. Japanese earns half of the English amount. */
-export function takerPointsFor(extraHints: number, lang: AnswerLanguage): number {
-  const english = pointsForHints(extraHints);
+export function takerPointsFor(extraHints: number, lang: AnswerLanguage, illustrationUsed = false): number {
+  const english = illustrationUsed ? Math.min(pointsForHints(extraHints), SCORING.ILLUSTRATION_MAX) : pointsForHints(extraHints);
   return lang === "ja" ? Math.round(english * SCORING.JAPANESE_SHARE) : english;
 }
 

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { SAMPLE_SET, type VocabWord } from "@/data/vocab";
-import { ClassService } from "@/lib/class/service";
+import { ClassService, type Drawer } from "@/lib/class/service";
 import { MemoryKV } from "@/lib/class/kv";
 import { redactForTaker, gameReducer as reduce, createInitialState as initialState } from "@/lib/game";
+import { parseAction } from "@/lib/class/engine";
+import { giverPointsFor, takerPointsFor } from "@/lib/scoring";
 import { approveSet, createActivity, createSet, setIllustration, todaysWords, updateWord } from "./ops";
 import { generateIllustration, illustrationPrompt, IllustrateError } from "./illustration";
 import { loadActivities, saveActivity, type StorageLike } from "./storage";
@@ -103,120 +105,379 @@ describe("drawing a picture (fake image service — no real call)", () => {
   });
 });
 
-describe("classroom: the picture is the Giver's alone", () => {
-  async function start(withPics: boolean) {
-    let now = 1_000_000;
-    const kv = new MemoryKV(() => now);
-    const svc = new ClassService(kv, () => now);
-    const set = todaysWords([approved(withPics)])!;
-    const created = await svc.createActivity({ title: set.title, words: set.words });
-    if (!created.ok) throw new Error("create");
-    const id = created.activity.id;
-    const A = await svc.join({ activityId: id, group: "4", name: "Aki" });
-    const B = await svc.join({ activityId: id, group: "4", name: "Ben" });
+
+// ------------------------------------------------------------------------------------------------
+// Illustration as a last-resort hint (classroom: server-side)
+// ------------------------------------------------------------------------------------------------
+const drawnPic = (id: string) => pic(`DRAWN-${id}`);
+const b64 = (src: string) => src.split(",")[1];
+
+/** A fake image service: counts calls, can fail, and can be held open to test overlapping requests. */
+function fakeDrawer(opts: { fail?: boolean; gate?: Promise<void> } = {}) {
+  const calls: string[] = [];
+  const drawer: Drawer = async (w) => {
+    calls.push(w.id);
+    if (opts.gate) await opts.gate;
+    if (opts.fail) throw new IllustrateError("upstream", "The picture service returned an error (HTTP 500).");
+    return { src: drawnPic(w.id), alt: "x" };
+  };
+  return { calls, drawer };
+}
+
+async function start(o: { studioPics?: boolean; drawer?: Drawer; noDrawer?: boolean } = {}) {
+  let now = 1_000_000;
+  const kv = new MemoryKV(() => now);
+  const svc = new ClassService(kv, () => now, {
+    ...(o.noDrawer ? {} : { drawer: o.drawer ?? fakeDrawer().drawer }),
+    lockWaitMs: 400,
+    sleep: () => new Promise((r) => setTimeout(r, 5)),
+  });
+  const set = todaysWords([approved(!!o.studioPics)])!;
+  const created = await svc.createActivity({ title: set.title, words: set.words });
+  if (!created.ok) throw new Error("create");
+  const id = created.activity.id;
+  async function pair(group: string) {
+    const A = await svc.join({ activityId: id, group, name: "Aki" });
+    const B = await svc.join({ activityId: id, group, name: "Ben" });
     if (!A.ok || !B.ok) throw new Error("join");
-    const act = (t: string, action: object, n: string) => svc.act({ activityId: id, group: "4", token: t, opId: n, action: action as never });
+    const act = (t: string, action: object, n: string) => svc.act({ activityId: id, group, token: t, opId: `${group}-${n}`, action: action as never });
     await act(A.token, { type: "PROPOSE_ROLES", giver: "me" }, "1");
     await act(B.token, { type: "CONFIRM_ROLES" }, "2");
     await act(A.token, { type: "CONTINUE" }, "3");
-    const view = async (t: string) => { const r = await svc.getView({ activityId: id, group: "4", token: t }); if (!r.ok || r.unchanged) throw new Error("view"); return r.view; };
-    return { svc, kv, id, A, B, act, view, set, created };
+    const view = async (t: string) => { const r = await svc.getView({ activityId: id, group, token: t }); if (!r.ok || r.unchanged) throw new Error("view"); return r.view; };
+    const ask = (t: string) => svc.requestIllustration({ activityId: id, group, token: t });
+    const pick = (n: number) => act(A.token, { type: "PICK", wordId: set.words[n].id }, `pick${n}`);
+    const guess = (text: string, n = "g") => act(B.token, { type: "GUESS", text }, n + Math.random());
+    const guessJa = (text: string) => act(B.token, { type: "GUESS_JA", text }, "j" + Math.random());
+    const scores = async () => (await view(A.token)).game!.players.map((p) => p.score);
+    return { A, B, act, view, ask, pick, guess, guessJa, scores, group };
   }
-  const cur = (v: Awaited<ReturnType<Awaited<ReturnType<typeof start>>["view"]>>) => v.game!.words.find((w) => w.id === v.game!.currentWordId)!;
+  return { svc, kv, id, set, pair, created };
+}
+const cur = (v: { game: { words: VocabWord[]; currentWordId: string | null } | null }) => v.game!.words.find((w) => w.id === v.game!.currentWordId)!;
+const PIC_RE = /base64/;
 
-  it("hosting stores pictures in their own keys, not in the activity record", async () => {
-    const { kv, id, set, created } = await start(true);
-    expect(await kv.get(`vqs:act:${id}`)).not.toContain("base64");
-    expect(created.ok && created.activity.words.every((w) => w.illustration?.src === "")).toBe(true);
-    for (const w of set.words) expect(await kv.get(`vqs:img:${id}:${w.id}`)).toBe(w.illustration!.src);
-  });
-  it("the Giver gets the picture of the word in play, from the start of the round; nothing else", async () => {
-    const { A, act, view, set } = await start(true);
-    await act(A.token, { type: "PICK", wordId: set.words[3].id }, "4");
-    const g = await view(A.token);
-    expect(cur(g).illustration?.src).toBe(pic("W3"));
-    const json = JSON.stringify(g);
-    for (const i of [0, 1, 2, 4, 5, 6, 7, 8, 9]) expect(json).not.toContain(Buffer.from(`JPEGDATA-W${i}-`.repeat(8)).toString("base64"));
-    // before a word is picked, no pictures are sent at all
-  });
-  it("the Giver is sent no picture before picking", async () => {
-    const { A, view } = await start(true);
-    expect(JSON.stringify(await view(A.token))).not.toContain("base64");
-  });
-  it("the Taker never receives a picture (marker or image), at any point in the round", async () => {
-    const { A, B, act, view, set } = await start(true);
-    await act(A.token, { type: "PICK", wordId: set.words[3].id }, "4");
-    await act(A.token, { type: "REVEAL_HINT" }, "5");
-    await act(B.token, { type: "GUESS", text: "wrong" }, "6");
-    for (const v of [await view(B.token)]) {
-      const json = JSON.stringify(v);
-      expect(json).not.toContain("illustration");
-      expect(json).not.toContain("base64");
-      expect(json).not.toContain("JPEGDATA");
+describe("illustration is NOT automatic", () => {
+  it("Studio-made pictures are not shown to the Giver at the start of a round (or to anyone), and no image is requested", async () => {
+    const f = fakeDrawer();
+    const e = await start({ studioPics: true, drawer: f.drawer });
+    const p = await e.pair("1");
+    await p.pick(3);
+    for (let i = 0; i < 3; i++) {
+      const g = await p.view(p.A.token), t = await p.view(p.B.token);
+      expect(JSON.stringify(g)).not.toMatch(PIC_RE);
+      expect(JSON.stringify(t)).not.toMatch(PIC_RE);
+      expect(cur(g).illustration).toBeUndefined();
+      expect(g.game!.illustrationUsed).toBeFalsy();
     }
-    await act(A.token, { type: "SKIP" }, "7");
-    expect(JSON.stringify(await view(B.token))).not.toContain("base64");
+    await e.svc.join({ activityId: e.id, group: "1", name: "Aki", token: p.A.token }); // reconnect
+    expect(f.calls).toHaveLength(0);
   });
-  it("after the round ends, nobody is sent the image again", async () => {
-    const { A, B, act, view, set } = await start(true);
-    await act(A.token, { type: "PICK", wordId: set.words[3].id }, "4");
-    await act(A.token, { type: "SKIP" }, "5");
-    expect(JSON.stringify(await view(A.token))).not.toContain("base64");
-    expect(JSON.stringify(await view(B.token))).not.toContain("base64");
+  it("hosting, picking, hints, polling and answering never trigger a paid image call", async () => {
+    const f = fakeDrawer();
+    const e = await start({ drawer: f.drawer });
+    const p = await e.pair("1");
+    await p.pick(0);
+    await p.act(p.A.token, { type: "REVEAL_HINT" }, "h");
+    for (let i = 0; i < 5; i++) await p.view(p.B.token);
+    await p.guess("wrong");
+    await p.guess(e.set.words[0].word);
+    expect(f.calls).toHaveLength(0);
   });
-  it("a reconnecting Giver (saved token) still gets the same picture; the activity is the same", async () => {
-    const { svc, A, id, act, set } = await start(true);
-    await act(A.token, { type: "PICK", wordId: set.words[5].id }, "4");
-    const again = await svc.join({ activityId: id, group: "4", name: "Aki", token: A.token });
-    if (!again.ok) throw new Error("rejoin");
-    expect(again.rejoined).toBe(true);
-    expect(cur(again.view).illustration?.src).toBe(pic("W5"));
-    expect(again.view.activityTitle).toBe(set.title);
-  });
-  it("a missing/expired image just means no picture — the round is still playable", async () => {
-    const { A, B, kv, id, act, view, set } = await start(true);
-    await kv.set(`vqs:img:${id}:${set.words[1].id}`, "", 1); // as if it had expired
-    await act(A.token, { type: "PICK", wordId: set.words[1].id }, "4");
-    const g = await view(A.token);
-    expect(cur(g).illustration).toBeUndefined();
-    expect(cur(g).word).toBe(set.words[1].word);
-    const r = await act(B.token, { type: "GUESS", text: set.words[1].word }, "5");
-    expect(r.ok && r.applied).toBe(true);
-  });
-  it("activities without pictures behave exactly as before", async () => {
-    const { A, B, act, view, set } = await start(false);
-    await act(A.token, { type: "PICK", wordId: set.words[0].id }, "4");
-    const g = await view(A.token);
-    expect(cur(g).illustration).toBeUndefined();
-    expect(cur(g).word).toBe(set.words[0].word);
-    expect(JSON.stringify(await view(B.token))).not.toContain(set.words[0].word);
-  });
-  it("pictures don't change scoring", async () => {
-    const withPics = await start(true), without = await start(false);
-    const play = async (e: typeof withPics) => {
-      await e.act(e.A.token, { type: "PICK", wordId: e.set.words[0].id }, "4");
-      await e.act(e.A.token, { type: "REVEAL_HINT" }, "5");
-      await e.act(e.B.token, { type: "GUESS", text: e.set.words[0].word }, "6");
-      return (await e.view(e.A.token)).game!.players.map((p) => p.score);
-    };
-    expect(await play(withPics)).toEqual(await play(without));
-  });
-  it("rejects a hostile or oversized picture on hosting instead of storing it", async () => {
-    const svc = new ClassService(new MemoryKV(() => 1), () => 1);
-    const w = words(false);
-    // a non-image data URL is simply dropped by coerceWord (the word is hosted without a picture)
-    const r = await svc.createActivity({ title: "t", words: [{ ...w[0], illustration: { src: "data:text/html;base64,AAAA" } }] });
-    expect(r.ok && r.activity.words[0].illustration).toBeUndefined();
+  it("a phone cannot apply the illustration penalty itself (it is not a client action)", async () => {
+    const e = await start();
+    const p = await e.pair("1");
+    await p.pick(0);
+    expect(parseAction({ type: "ILLUSTRATION_USED" })).toBeNull();
+    const r = await p.act(p.A.token, { type: "ILLUSTRATION_USED" }, "x");
+    expect(r.ok).toBe(false);
+    expect((await p.view(p.A.token)).game!.illustrationUsed).toBeFalsy();
   });
 });
 
-describe("demo mode: the Taker's screen never carries the picture", () => {
-  it("redactForTaker strips it while the word is unsolved", () => {
-    let s = initialState();
-    s = reduce(s, { type: "START", names: ["A", "B"], words: words(true) });
-    s = reduce(s, { type: "PICK", wordId: "p2" });
-    const giverSees = s.words.find((w) => w.id === "p2")!;
-    expect(giverSees.illustration?.src).toBe(pic("W2"));
+describe("requesting an illustration: who, and what the server decides", () => {
+  it("only the active Giver; the Taker, a stranger and a premature request are refused without any AI call", async () => {
+    const f = fakeDrawer();
+    const e = await start({ drawer: f.drawer });
+    const p = await e.pair("1");
+    const early = await p.ask(p.A.token);
+    expect(early).toMatchObject({ ok: false, code: "bad_action" }); // no word in play yet
+    await p.pick(1);
+    expect(await p.ask(p.B.token)).toMatchObject({ ok: false, code: "forbidden" });
+    expect(await p.ask("not-a-token")).toMatchObject({ ok: false, code: "unauthorized" });
+    expect(await e.svc.requestIllustration({ activityId: e.id, group: "99", token: p.A.token })).toMatchObject({ ok: false });
+    expect(f.calls).toHaveLength(0);
+    expect(((await p.view(p.A.token)).game!.illustrationUsed)).toBeFalsy();
+    expect(await p.scores()).toEqual([0, 0]);
+  });
+  it("the server picks the word: it draws the word in play, whatever else exists", async () => {
+    const f = fakeDrawer();
+    const e = await start({ drawer: f.drawer });
+    const p = await e.pair("1");
+    await p.pick(6);
+    expect((await p.ask(p.A.token)).ok).toBe(true);
+    expect(f.calls).toEqual([e.set.words[6].id]);
+  });
+  it("after the round ends nobody can ask for (or be charged for) an illustration", async () => {
+    const f = fakeDrawer();
+    const e = await start({ drawer: f.drawer });
+    const p = await e.pair("1");
+    await p.pick(0);
+    await p.act(p.A.token, { type: "SKIP" }, "s");
+    expect(await p.ask(p.A.token)).toMatchObject({ ok: false, code: "bad_action" });
+    expect(f.calls).toHaveLength(0);
+  });
+});
+
+describe("successful illustration: the Giver sees it, the score is capped, the Taker never gets it", () => {
+  it("draws once, caches, shows the Giver only, and caps the word at 25 (English)", async () => {
+    const f = fakeDrawer();
+    const e = await start({ drawer: f.drawer });
+    const p = await e.pair("1");
+    await p.pick(2);
+    const r = await p.ask(p.A.token);
+    if (!r.ok) throw new Error(r.message);
+    expect(r.applied).toBe(true);
+    expect(cur(r.view!).illustration?.src).toBe(drawnPic(e.set.words[2].id));
+    expect(r.view!.game!.illustrationUsed).toBe(true);
+    expect(await e.kv.get(`vqs:img:${e.id}:${e.set.words[2].id}`)).toBe(drawnPic(e.set.words[2].id));
+    const t = await p.view(p.B.token);
+    const tj = JSON.stringify(t);
+    expect(tj).not.toMatch(PIC_RE);
+    expect(tj).not.toContain(b64(drawnPic(e.set.words[2].id)));
+    expect(cur(t).illustration).toBeUndefined();
+    expect(t.game!.illustrationUsed).toBe(true); // the Taker only learns the word is now worth less
+    await p.guess(e.set.words[2].word);
+    expect(await p.scores()).toEqual([13, 25]); // Giver: half of 25, rounded up
+  });
+  it("is capped at 25 even when no text hint was used, and also after text hints", async () => {
+    const e = await start();
+    const p = await e.pair("1");
+    await p.pick(0);
+    await p.act(p.A.token, { type: "REVEAL_HINT" }, "h1");
+    await p.ask(p.A.token);
+    await p.guess(e.set.words[0].word);
+    expect(await p.scores()).toEqual([13, 25]);
+  });
+  it("Japanese answer after an illustration earns 13 (Giver 7)", async () => {
+    const e = await start();
+    const p = await e.pair("1");
+    await p.pick(0);
+    await p.ask(p.A.token);
+    const ja = e.set.words[0].ja![0];
+    const r = await p.guessJa(ja);
+    expect(r.ok && r.applied).toBe(true);
+    expect(await p.scores()).toEqual([7, 13]);
+  });
+  it("scoring arithmetic: 25/13 for every hint count; Giver gets half, rounded up", () => {
+    for (let n = 0; n <= 6; n++) {
+      expect(takerPointsFor(n, "en", true)).toBe(25);
+      expect(takerPointsFor(n, "ja", true)).toBe(13);
+    }
+    expect(giverPointsFor(25)).toBe(13);
+    expect(giverPointsFor(13)).toBe(7);
+    expect(takerPointsFor(0, "en", false)).toBe(100); // unchanged without an illustration
+    expect(takerPointsFor(1, "ja", false)).toBe(43);
+  });
+  it("the cap cannot be avoided by refreshing, reconnecting or asking again (and is never charged twice)", async () => {
+    const f = fakeDrawer();
+    const e = await start({ drawer: f.drawer });
+    const p = await e.pair("1");
+    await p.pick(0);
+    await p.ask(p.A.token);
+    const again = await p.ask(p.A.token);
+    expect(again.ok && again.applied).toBe(false);
+    expect(f.calls).toHaveLength(1);
+    const rejoin = await e.svc.join({ activityId: e.id, group: "1", name: "Aki", token: p.A.token });
+    if (!rejoin.ok) throw new Error("rejoin");
+    expect(rejoin.view.game!.illustrationUsed).toBe(true);
+    expect(cur(rejoin.view).illustration?.src).toBe(drawnPic(e.set.words[0].id)); // still there after reconnecting, same round
+    const tRejoin = await e.svc.join({ activityId: e.id, group: "1", name: "Ben", token: p.B.token });
+    if (!tRejoin.ok) throw new Error("rejoin");
+    expect(JSON.stringify(tRejoin.view)).not.toMatch(PIC_RE);
+    await p.guess(e.set.words[0].word);
+    expect(await p.scores()).toEqual([13, 25]);
+  });
+  it("the cap is for that round only: the next word is worth full points again", async () => {
+    const e = await start();
+    const p = await e.pair("1");
+    await p.pick(0);
+    await p.ask(p.A.token);
+    await p.act(p.A.token, { type: "SKIP" }, "s");
+    await p.act(p.A.token, { type: "NEXT" }, "n");
+    await p.act(p.B.token, { type: "CONTINUE" }, "c"); // roles swap: Ben is the Giver now
+    const gBen = await p.act(p.B.token, { type: "PICK", wordId: e.set.words[1].id }, "p2");
+    expect(gBen.ok).toBe(true);
+    const v = await p.view(p.B.token);
+    expect(v.game!.illustrationUsed).toBe(false);
+    expect(JSON.stringify(v)).not.toMatch(PIC_RE);
+    await p.act(p.A.token, { type: "GUESS", text: e.set.words[1].word }, "g");
+    expect((await p.scores())[0]).toBe(100); // Aki, the Taker now, earns the full 100
+  });
+});
+
+describe("failed illustration: no penalty, the game continues", () => {
+  it("reports the failure, deducts nothing, stays playable, and allows a later retry", async () => {
+    const bad = fakeDrawer({ fail: true });
+    const e = await start({ drawer: bad.drawer });
+    const p = await e.pair("1");
+    await p.pick(0);
+    const r = await p.ask(p.A.token);
+    expect(r).toMatchObject({ ok: false, code: "picture_failed" });
+    expect(r.ok ? "" : r.message).toMatch(/score is unchanged/i);
+    expect(r.ok ? "" : r.message).not.toMatch(/HTTP|sk-/); // no upstream details
+    const v = await p.view(p.A.token);
+    expect(v.game!.illustrationUsed).toBeFalsy();
+    expect(cur(v).illustration).toBeUndefined();
+    await p.guess(e.set.words[0].word);
+    expect(await p.scores()).toEqual([50, 100]); // full points
+  });
+  it("a failed drawing releases the lock so the next request can draw", async () => {
+    let fail = true;
+    const calls: string[] = [];
+    const drawer: Drawer = async (w) => { calls.push(w.id); if (fail) throw new IllustrateError("timeout", "The picture took too long to draw. Try again."); return { src: drawnPic(w.id) }; };
+    const e = await start({ drawer });
+    const p = await e.pair("1");
+    await p.pick(0);
+    expect((await p.ask(p.A.token)).ok).toBe(false);
+    fail = false;
+    const r = await p.ask(p.A.token);
+    expect(r.ok && r.applied).toBe(true);
+    expect(calls).toHaveLength(2);
+  });
+  it("with no image service configured the request fails politely and costs nothing", async () => {
+    const e = await start({ noDrawer: true });
+    const p = await e.pair("1");
+    await p.pick(0);
+    expect(await p.ask(p.A.token)).toMatchObject({ ok: false, code: "picture_failed" });
+    await p.guess(e.set.words[0].word);
+    expect(await p.scores()).toEqual([50, 100]);
+  });
+  it("if the round ends while the picture is being drawn, the Taker's full score stands and the Giver is not charged", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const f = fakeDrawer({ gate });
+    const e = await start({ drawer: f.drawer });
+    const p = await e.pair("1");
+    await p.pick(0);
+    const pending = p.ask(p.A.token);
+    await new Promise((r) => setTimeout(r, 20));
+    await p.guess(e.set.words[0].word); // the Taker answers while it is drawing
+    release();
+    const r = await pending;
+    expect(r).toMatchObject({ ok: false, code: "bad_action" });
+    expect(await p.scores()).toEqual([50, 100]);
+  });
+});
+
+describe("caching and no duplicate paid images", () => {
+  it("reuses a picture made in Studio: no AI call, the cap applies, the Giver sees that exact picture", async () => {
+    const f = fakeDrawer();
+    const e = await start({ studioPics: true, drawer: f.drawer });
+    const p = await e.pair("1");
+    await p.pick(3);
+    const r = await p.ask(p.A.token);
+    if (!r.ok) throw new Error(r.message);
+    expect(cur(r.view!).illustration?.src).toBe(pic("W3"));
+    expect(f.calls).toHaveLength(0);
+    expect(r.view!.game!.illustrationUsed).toBe(true);
+  });
+  it("two groups in one activity asking for the same word cost one image", async () => {
+    const f = fakeDrawer();
+    const e = await start({ drawer: f.drawer });
+    const p1 = await e.pair("1"), p2 = await e.pair("2");
+    await p1.pick(4); await p2.pick(4);
+    expect((await p1.ask(p1.A.token)).ok).toBe(true);
+    expect((await p2.ask(p2.A.token)).ok).toBe(true);
+    expect(f.calls).toHaveLength(1);
+    await p2.guess(e.set.words[4].word);
+    expect(await p2.scores()).toEqual([13, 25]);
+  });
+  it("simultaneous requests for the same word draw exactly once", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const f = fakeDrawer({ gate });
+    const e = await start({ drawer: f.drawer });
+    const p1 = await e.pair("1"), p2 = await e.pair("2");
+    await p1.pick(5); await p2.pick(5);
+    const a = p1.ask(p1.A.token), a2 = p1.ask(p1.A.token), b = p2.ask(p2.A.token);
+    await new Promise((r) => setTimeout(r, 30));
+    release();
+    const rs = await Promise.all([a, a2, b]);
+    expect(rs.map((r) => (r.ok ? "ok" : r.code + ":" + r.message))).toEqual(["ok", "ok", "ok"]);
+    expect(f.calls).toHaveLength(1);
+    expect(await p1.scores()).toEqual([0, 0]);
+    await p1.guess(e.set.words[5].word);
+    expect(await p1.scores()).toEqual([13, 25]); // charged once
+  });
+  it("a request that waits too long for someone else's drawing gives up without charging", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const f = fakeDrawer({ gate });
+    const e = await start({ drawer: f.drawer });
+    const p1 = await e.pair("1"), p2 = await e.pair("2");
+    await p1.pick(5); await p2.pick(5);
+    const first = p1.ask(p1.A.token);
+    await new Promise((r) => setTimeout(r, 20));
+    const second = await p2.ask(p2.A.token); // lock wait is 400 ms in this test
+    expect(second).toMatchObject({ ok: false, code: "busy" });
+    expect(((await p2.view(p2.A.token)).game!.illustrationUsed)).toBeFalsy();
+    release();
+    await first;
+    const retry = await p2.ask(p2.A.token); // now cached
+    expect(retry.ok && retry.applied).toBe(true);
+    expect(f.calls).toHaveLength(1);
+  });
+});
+
+describe("compatibility", () => {
+  it("Preset Vocabulary (no pictures) works: the picture is drawn on demand only", async () => {
+    const f = fakeDrawer();
+    let now = 1;
+    const svc = new ClassService(new MemoryKV(() => now), () => now, { drawer: f.drawer });
+    const c = await svc.createActivity({ title: SAMPLE_SET.title, words: SAMPLE_SET.words });
+    if (!c.ok) throw new Error("c");
+    const A = await svc.join({ activityId: c.activity.id, group: "1", name: "A" });
+    const B = await svc.join({ activityId: c.activity.id, group: "1", name: "B" });
+    if (!A.ok || !B.ok) throw new Error("j");
+    const act = (t: string, action: object, n: string) => svc.act({ activityId: c.activity.id, group: "1", token: t, opId: n, action: action as never });
+    await act(A.token, { type: "PROPOSE_ROLES", giver: "me" }, "1"); await act(B.token, { type: "CONFIRM_ROLES" }, "2"); await act(A.token, { type: "CONTINUE" }, "3");
+    await act(A.token, { type: "PICK", wordId: SAMPLE_SET.words[0].id }, "4");
+    expect(f.calls).toHaveLength(0);
+    const r = await svc.requestIllustration({ activityId: c.activity.id, group: "1", token: A.token });
+    expect(r.ok && r.applied).toBe(true);
+    expect(f.calls).toEqual([SAMPLE_SET.words[0].id]);
+  });
+});
+
+describe("demo mode (one local screen)", () => {
+  const demo = (withPics: boolean) => {
+    let s = reduce(initialState(), { type: "START", names: ["A", "B"], words: words(withPics) });
+    s = reduce(s, { type: "CONTINUE" });
+    return reduce(s, { type: "PICK", wordId: "p2" });
+  };
+  it("starts without the illustration; a Studio picture is not shown until requested", () => {
+    const s = demo(true);
+    expect(s.illustrationUsed).toBe(false);
+  });
+  it("requesting applies the cap (25 / 13) and can attach a freshly drawn picture; asking twice changes nothing", () => {
+    let s = demo(false);
+    s = reduce(s, { type: "ILLUSTRATION_USED", illustration: { src: pic("demo") } });
+    expect(s.illustrationUsed).toBe(true);
+    expect(s.words.find((w) => w.id === "p2")!.illustration?.src).toBe(pic("demo"));
+    expect(reduce(s, { type: "ILLUSTRATION_USED", illustration: { src: pic("other") } })).toBe(s);
+    const solved = reduce(s, { type: "GUESS", text: "zorb" + SAMPLE_SET.words[2].word });
+    expect(solved.lastResult).toMatchObject({ outcome: "solved", takerPoints: 25, giverPoints: 13, illustration: true });
+  });
+  it("Japanese in demo after an illustration: 13", () => {
+    let s = reduce(demo(false), { type: "ILLUSTRATION_USED" });
+    s = reduce(s, { type: "GUESS_JA", text: SAMPLE_SET.words[2].ja![0] });
+    expect(s.lastResult).toMatchObject({ takerPoints: 13, giverPoints: 7, answeredIn: "ja" });
+  });
+  it("is only possible while a word is in play, and the Taker's demo screen never carries the picture", () => {
+    const board = reduce(reduce(reduce(initialState(), { type: "START", names: ["A", "B"], words: words(false) }), { type: "CONTINUE" }), { type: "CONTINUE" });
+    expect(reduce(board, { type: "ILLUSTRATION_USED" })).toBe(board);
+    const s = reduce(demo(false), { type: "ILLUSTRATION_USED", illustration: { src: pic("demo") } });
     expect(JSON.stringify(redactForTaker(s))).not.toContain("base64");
   });
 });

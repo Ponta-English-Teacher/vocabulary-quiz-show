@@ -104,7 +104,7 @@ export function SetPanel({
               const missing = set.words.length - have;
               return (
                 <>
-                  <span className="note">🖼 Giver pictures: {have} of {set.words.length}. Private to the Giver — not a hint, no points lost.</span>
+                  <span className="note">🖼 Giver pictures: {have} of {set.words.length}. Optional: during play the Giver can ask for one as a last-resort hint (score capped at 25); the game draws one on demand if none is made here.</span>
                   {missing > 0 ? (
                     <button type="button" className="btn btn--small" disabled={disabled || !canGenerate} onClick={() => onIllustrateAll(set.id)}>
                       Draw {missing} picture{missing === 1 ? "" : "s"} (AI)

@@ -656,3 +656,6 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .giver-pic img { width: min(100%, 22rem); aspect-ratio: 1 / 1; object-fit: contain; border-radius: 0.8rem; background: #fff; }
 .picbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0.4rem 0; }
 .picset__img { width: min(100%, 14rem); border-radius: 0.6rem; background: #fff; }
+
+.illreq { display: grid; gap: 0.4rem; justify-items: start; margin-top: 0.6rem; }
+.illreq__confirm { display: grid; gap: 0.4rem; padding: 0.7rem 0.9rem; border: 1px solid #ffd34e; border-radius: 0.7rem; }

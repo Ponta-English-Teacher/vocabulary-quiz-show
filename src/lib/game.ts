@@ -1,4 +1,4 @@
-import type { VocabWord } from "@/data/vocab";
+import type { Illustration, VocabWord } from "@/data/vocab";
 import { checkAnswer } from "./answer";
 import { checkJapaneseAnswer } from "./japanese";
 import { FREE_HINTS, giverPointsFor, takerPointsFor, type AnswerLanguage } from "./scoring";
@@ -42,6 +42,8 @@ export interface RoundResult {
   /** Extra (paid) hints used — the free opening hint is not counted. */
   hintsUsed: number;
   wrongGuesses: number;
+  /** True when the Giver was shown the illustration (score capped). */
+  illustration?: true;
   takerPoints: number;
   giverPoints: number;
   /** Language of the correct answer (absent for a skipped word and for results saved before Japanese answers existed). */
@@ -60,6 +62,8 @@ export interface GameState {
   revealedHints: number;
   /** PAID hints: extra prepared hints revealed + spoken hints added by hand. The opening hint never counts. */
   hintsUsed: number;
+  /** The Giver asked for (and was shown) the illustration this round: the word is now worth at most ILLUSTRATION_MAX. */
+  illustrationUsed: boolean;
   wrongGuesses: number;
   feedback: Feedback | null;
   lastResult: RoundResult | null;
@@ -73,6 +77,11 @@ export type GameAction =
   | { type: "PICK"; wordId: string }
   | { type: "REVEAL_HINT" }
   | { type: "ADJUST_HINTS"; delta: 1 | -1 }
+  /**
+   * The illustration was made available to the Giver. In the classroom ONLY the server applies this (it is not a
+   * ClientAction, so a phone cannot send it); in demo mode the local game applies it, optionally carrying the picture.
+   */
+  | { type: "ILLUSTRATION_USED"; illustration?: Illustration }
   | { type: "GUESS"; text: string }
   | { type: "GUESS_JA"; text: string }
   | { type: "SKIP" }
@@ -95,6 +104,7 @@ export function createInitialState(): GameState {
     currentWordId: null,
     revealedHints: 0,
     hintsUsed: 0,
+    illustrationUsed: false,
     wrongGuesses: 0,
     feedback: null,
     lastResult: null,
@@ -141,7 +151,7 @@ function finishRound(
   if (!word) return state;
   const taker = takerOf(state.giver);
   const solved = outcome === "solved";
-  const takerPoints = solved ? takerPointsFor(state.hintsUsed, lang) : 0;
+  const takerPoints = solved ? takerPointsFor(state.hintsUsed, lang, !!state.illustrationUsed) : 0;
   const giverPoints = solved ? giverPointsFor(takerPoints) : 0;
   const result: RoundResult = {
     wordId: word.id,
@@ -150,6 +160,7 @@ function finishRound(
     taker,
     hintsUsed: state.hintsUsed,
     wrongGuesses: state.wrongGuesses,
+    ...(state.illustrationUsed ? { illustration: true as const } : {}),
     takerPoints,
     giverPoints,
     ...(solved ? { answeredIn: lang } : {}),
@@ -201,6 +212,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         // The opening hint is on screen from the first moment and is free (it is prepared data — no AI call).
         revealedHints: Math.min(FREE_HINTS, picked?.hints.length ?? 0),
         hintsUsed: 0,
+        illustrationUsed: false,
         wrongGuesses: 0,
         feedback: null,
       };
@@ -222,6 +234,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       // A hint that has been revealed can't be "un-given"; only spoken ones can be undone.
       const hintsUsed = Math.max(paidRevealedHints(state), state.hintsUsed + action.delta);
       return { ...state, hintsUsed };
+    }
+
+    case "ILLUSTRATION_USED": {
+      const word = currentWord(state);
+      if (state.phase !== "round" || !word) return state;
+      // Idempotent: asking again (refresh, retry, a second tap) changes nothing.
+      if (state.illustrationUsed) return state;
+      const words = action.illustration
+        ? state.words.map((w) => (w.id === word.id ? { ...w, illustration: action.illustration } : w))
+        : state.words;
+      return { ...state, words, illustrationUsed: true };
     }
 
     case "GUESS": {

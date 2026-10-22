@@ -3,7 +3,7 @@ import type { ErrorCode } from "./types";
 
 const STATUS: Record<ErrorCode, number> = {
   no_activity: 404, no_room: 404, bad_group: 400, bad_name: 400, bad_request: 400,
-  full: 409, unauthorized: 401, forbidden: 403, bad_action: 400, busy: 503, unavailable: 503,
+  full: 409, unauthorized: 401, forbidden: 403, bad_action: 400, busy: 503, unavailable: 503, picture_failed: 502,
 };
 
 export const errorResponse = (code: ErrorCode, message: string) =>

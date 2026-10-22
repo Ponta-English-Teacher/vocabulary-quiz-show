@@ -178,6 +178,24 @@ function gameAction(room: Room, action: ClientAction): boolean {
   return true;
 }
 
+/**
+ * SERVER-ONLY: the picture was made available to the Giver, so the word's score is capped from now on.
+ * Not reachable through parseAction/applyAction, so no phone can send it. Checks again that this seat is still the Giver,
+ * that the round is still running and that the word in play is still the one the picture was made for.
+ */
+export function markIllustration(room: Room, seat: 0 | 1, wordId: string, now: number): "applied" | "already" | Fail {
+  const game = room.game;
+  if (!game) return fail("bad_action", "The game hasn't started yet.");
+  if (game.giver !== seat) return fail("forbidden", "Only the Giver can ask for an illustration.");
+  if (game.phase !== "round" || game.currentWordId !== wordId) return fail("bad_action", "That round has already ended, so your score is unchanged.");
+  if (game.illustrationUsed) return "already";
+  const next = gameReducer(game, { type: "ILLUSTRATION_USED" });
+  if (next === game) return fail("bad_action", "That round has already ended, so your score is unchanged.");
+  room.game = next;
+  bump(room, now);
+  return "applied";
+}
+
 export type ActOutcome =
   | { error: Fail }
   | { applied: false; duplicate: boolean }

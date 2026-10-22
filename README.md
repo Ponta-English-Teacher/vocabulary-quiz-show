@@ -76,6 +76,13 @@ Open the app → **Teacher Studio** (welcome screen). Talk to the AI producer, g
 - **Speaking an answer (Taker):** a microphone button next to the answer box uses the browser's speech recognition (`src/lib/dictation.ts`). It starts only when pressed (that is when the permission prompt appears), listens to one short utterance, puts the words in the box for the student to edit, and NEVER submits. No audio is recorded or stored by the app; the browser's speech service (Google for Chrome, Apple for Safari) may process the audio.
 - **Needs HTTPS on phones.** Microphone features require a secure context. `http://localhost` counts as secure; `http://192.168.x.x` (the classroom LAN link) does NOT — there the button explains this and typing / the keyboard's own microphone key still work.
 
-## Giver pictures
+## Giver illustration (a last-resort hint)
 
-Each word can carry one AI-drawn picture (`illustration` on the word). It is drawn in Teacher Studio (button "Draw N pictures (AI)", or "Draw picture" on one word) — never during play — and is private to the Giver: it shows from the start of the round, is not a hint and costs no points. The Taker's screen never receives it. In a hosted class the picture is stored in its own Redis key (`vqs:img:<activity>:<word>`, 24 h) and the server adds it only to the Giver's view of the word in play. Words without a picture (older sets, the preset) play exactly as before. Needs `OPENAI_API_KEY` (optional `OPENAI_IMAGE_MODEL`, default `gpt-image-1-mini`, low quality ≈ one small image per word).
+Illustrations are **not** shown automatically and nothing is drawn in advance. The Giver can press **"I need an illustration"** (after a confirmation: "An illustration will reduce the available score to 25 points"). Then:
+
+- the server (not the browser) checks that the caller is the Giver and decides the word from the room's own state;
+- a picture already made for that activity + word is reused (made in Teacher Studio, or drawn earlier); only if there is none, ONE image is drawn with the existing OpenAI setup (`OPENAI_API_KEY`; `OPENAI_IMAGE_MODEL`, default `gpt-image-1-mini`, low quality) and cached in Redis (`vqs:img:<activity>:<word>`, 24 h). A short lock (`vqs:imglock:…`) keeps simultaneous requests from drawing twice;
+- only after a picture is available is the cap applied, atomically on the room: the word is worth at most **25** (English) / **13** (Japanese), whatever text hints were used; the Giver still gets half of the Taker's points (13 / 7, halves round up). Refreshing, reconnecting or asking again changes nothing; a failed drawing costs nothing;
+- the picture is sent only to the Giver's phone, only for the word in play, only after the request. The Taker only learns that the word is now worth less.
+
+In demo mode (one screen, no server room) the same button uses a picture made in Studio, or the teacher-protected Studio route. Teacher Studio can still pre-draw pictures ("Draw picture (AI)") so they can be reused without a second image call; they are never shown without the request. `OPENAI_IMAGES_URL` (server env, for tests only) replaces the OpenAI images endpoint.

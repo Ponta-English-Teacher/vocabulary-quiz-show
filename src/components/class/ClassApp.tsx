@@ -66,7 +66,7 @@ export function ClassApp({ activityId }: { activityId: string }) {
         {game.phase !== "final" ? <Hud state={game} /> : null}
         {game.phase === "switch" ? <RoleSwitch key={game.history.length} state={game} you={view.role} onContinue={() => dispatch({ type: "CONTINUE" })} /> : null}
         {game.phase === "board" ? <Board state={game} canPick={view.role === "giver"} onPick={(wordId) => dispatch({ type: "PICK", wordId })} /> : null}
-        {game.phase === "round" && view.role === "giver" ? <GiverRound state={game} dispatch={dispatch} /> : null}
+        {game.phase === "round" && view.role === "giver" ? <GiverRound state={game} dispatch={dispatch} onRequestIllustration={s.requestIllustration} /> : null}
         {game.phase === "round" && view.role === "taker" ? <TakerRound state={game} dispatch={dispatch} /> : null}
         {game.phase === "reveal" ? <Reveal state={game} onNext={() => dispatch({ type: "NEXT" })} /> : null}
         {game.phase === "final" ? <Final state={game} onAgain={() => dispatch({ type: "RESET" })} /> : null}

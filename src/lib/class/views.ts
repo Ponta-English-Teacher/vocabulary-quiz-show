@@ -14,7 +14,7 @@ export function redactForGiver(state: GameState): GameState {
   const words = state.words.map((w) => {
     const pending = state.statuses[w.id] === "pending";
     const inPlay = state.phase === "round" && w.id === state.currentWordId;
-    if (inPlay) return { ...w, ja: [] };
+    if (inPlay) return { ...w, ja: [], illustration: undefined };
     if (!pending) return w;
     return { ...w, ...BLANK, hints: w.hints.map(() => "") };
   });
@@ -36,6 +36,11 @@ export function scrubFinished(state: GameState): GameState {
   return { ...state, words: words.map((w, i) => ({ ...w, word: state.words[i].word })) };
 }
 
+/**
+ * No picture (and no "a picture exists" marker) ever travels with the ordinary game state. The server adds the Giver's
+ * picture afterwards, to the Giver only, and only once the Giver has asked for it (see ClassService.withPicture).
+ */
 export function redactForRole(state: GameState, role: SeatRole): GameState {
-  return scrubFinished(role === "giver" ? redactForGiver(state) : redactForTaker(state));
+  const safe = scrubFinished(role === "giver" ? redactForGiver(state) : redactForTaker(state));
+  return { ...safe, words: safe.words.map((w) => (w.illustration ? { ...w, illustration: undefined } : w)) };
 }

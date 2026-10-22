@@ -35,6 +35,8 @@ export function illustrationPrompt(w: DrawWord): string {
 export interface IllustrateConfig {
   apiKey: string;
   model?: string;
+  /** Test hook (server env only): a stand-in for the OpenAI images endpoint. Defaults to OpenAI. */
+  url?: string;
   fetchImpl?: FetchLike;
   timeoutMs?: number;
 }
@@ -43,7 +45,7 @@ export async function generateIllustration(cfg: IllustrateConfig, w: DrawWord): 
   const doFetch: FetchLike = cfg.fetchImpl ?? ((url, init) => fetch(url, init));
   let res: Response;
   try {
-    res = await doFetch("https://api.openai.com/v1/images/generations", {
+    res = await doFetch(cfg.url || "https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
       body: JSON.stringify({
