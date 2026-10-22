@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SAMPLE_SET, type VocabWord } from "@/data/vocab";
-import { ClassService, type Drawer } from "@/lib/class/service";
+import { ClassService, MAX_DRAWS_PER_ACTIVITY, MAX_DRAWS_PER_WORD, type Drawer } from "@/lib/class/service";
 import { MemoryKV } from "@/lib/class/kv";
 import { redactForTaker, gameReducer as reduce, createInitialState as initialState } from "@/lib/game";
 import { parseAction } from "@/lib/class/engine";
@@ -427,6 +427,44 @@ describe("caching and no duplicate paid images", () => {
     const retry = await p2.ask(p2.A.token); // now cached
     expect(retry.ok && retry.applied).toBe(true);
     expect(f.calls).toHaveLength(1);
+  });
+});
+
+describe("cost guard (abuse protection)", () => {
+  it("failed drawings are capped per word: after the limit no further paid call is made", async () => {
+    const calls: string[] = [];
+    const drawer: Drawer = async (w) => { calls.push(w.id); throw new IllustrateError("timeout", "slow"); };
+    const e = await start({ drawer });
+    const p = await e.pair("1");
+    await p.pick(0);
+    for (let i = 0; i < MAX_DRAWS_PER_WORD + 4; i++) await p.ask(p.A.token);
+    expect(calls).toHaveLength(MAX_DRAWS_PER_WORD);
+    const last = await p.ask(p.A.token);
+    expect(last).toMatchObject({ ok: false, code: "picture_failed" });
+    expect(last.ok ? "" : last.message).toMatch(/score is unchanged/i);
+    expect(await p.scores()).toEqual([0, 0]);
+    await p.guess(e.set.words[0].word);
+    expect(await p.scores()).toEqual([50, 100]); // still fully playable, full points
+  });
+  it("a success is cached and uses one attempt; asking again (or from another group) never draws again", async () => {
+    const f = fakeDrawer();
+    const e = await start({ drawer: f.drawer });
+    const p1 = await e.pair("1"), p2 = await e.pair("2");
+    await p1.pick(0); await p2.pick(0);
+    for (let i = 0; i < 5; i++) await p1.ask(p1.A.token);
+    await p2.ask(p2.A.token);
+    expect(f.calls).toHaveLength(1);
+  });
+  it("there is also an overall limit per hosted activity", async () => {
+    const f = fakeDrawer();
+    const e = await start({ drawer: f.drawer });
+    const p = await e.pair("1");
+    await p.pick(0);
+    for (let i = 0; i < MAX_DRAWS_PER_ACTIVITY; i++) await e.kv.incr(`vqs:imgtries:${e.id}`, 60); // the activity has used up its budget
+    const r = await p.ask(p.A.token);
+    expect(r).toMatchObject({ ok: false, code: "picture_failed" });
+    expect(f.calls).toHaveLength(0);
+    expect(await p.scores()).toEqual([0, 0]);
   });
 });
 

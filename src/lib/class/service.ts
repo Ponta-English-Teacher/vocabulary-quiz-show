@@ -36,6 +36,14 @@ const imgKey = (activityId: string, wordId: string) => `vqs:img:${activityId}:${
 const MAX_PICTURE_CHARS = 4_000_000;
 /** One paid image at a time per (activity, word): whoever holds this key draws; everyone else waits for the cached result. */
 const lockKey = (activityId: string, wordId: string) => `vqs:imglock:${activityId}:${wordId}`;
+/**
+ * Cost guard. A success is cached (so a word is drawn once per activity), but FAILED drawings (timeouts, refusals) leave
+ * nothing cached and may still be billed, so attempts are capped: per word, and per hosted activity overall.
+ */
+export const MAX_DRAWS_PER_WORD = 3;
+export const MAX_DRAWS_PER_ACTIVITY = 40;
+const wordTriesKey = (activityId: string, wordId: string) => `vqs:imgtries:${activityId}:${wordId}`;
+const activityTriesKey = (activityId: string) => `vqs:imgtries:${activityId}`;
 const LOCK_TTL = 150; // seconds; longer than the image call can take, so a crashed request can't block a word for long
 const presKey = (activityId: string, group: string, seat: 0 | 1) => `vqs:pres:${activityId}:${group}:${seat}`;
 
@@ -206,6 +214,10 @@ export class ClassService {
           try {
             src = await this.kv.get(cacheKey); // another request may have finished just before we got the lock
             if (!src) {
+              const [perWord, perActivity] = [await this.kv.incr(wordTriesKey(input.activityId, wordId), ACTIVITY_TTL), await this.kv.incr(activityTriesKey(input.activityId), ACTIVITY_TTL)];
+              if (perWord > MAX_DRAWS_PER_WORD || perActivity > MAX_DRAWS_PER_ACTIVITY) {
+                return fail("picture_failed", "No more illustrations can be drawn for this word right now. Your score is unchanged — keep playing.");
+              }
               src = (await this.opts.drawer(word)).src;
               await this.kv.set(cacheKey, src, ACTIVITY_TTL);
             }
