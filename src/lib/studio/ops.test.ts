@@ -100,7 +100,9 @@ describe("approval", () => {
   });
   it("blocks approval for wrong size, leaks, and duplicates", () => {
     const { a, setId } = fixture();
-    expect(approvalProblems({ ...a.sets[0], words: a.sets[0].words.slice(0, 9) })[0]).toMatch(/exactly 10/);
+    expect(approvalProblems({ ...a.sets[0], words: [] })[0]).toMatch(/1 to 10 words/);
+    expect(approvalProblems({ ...a.sets[0], words: [...a.sets[0].words, ...a.sets[0].words.slice(0, 1)] }).join()).toMatch(/1 to 10 words/);
+    expect(approvalProblems({ ...a.sets[0], words: a.sets[0].words.slice(0, 9) })).toEqual([]); // a smaller set is fine
     const leaky = updateWord(a, setId, "id-cat", { hints: ["a cat!", "b", "c"] });
     expect(approveSet(leaky, setId).problems.join()).toMatch(/gives away/);
     expect(approveSet(leaky, setId).activity).toBe(leaky);

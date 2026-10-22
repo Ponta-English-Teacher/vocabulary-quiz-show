@@ -654,3 +654,13 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 
 .illreq { display: grid; gap: 0.4rem; justify-items: start; margin-top: 0.6rem; }
 .illreq__confirm { display: grid; gap: 0.4rem; padding: 0.7rem 0.9rem; border: 1px solid #ffd34e; border-radius: 0.7rem; }
+
+/* ---- Teacher Studio: editable candidate words ---------------------------- */
+.cands__head { margin: 0 0 0.4rem; }
+.cands__group { margin: 0.35rem 0; }
+.cands__list { list-style: none; margin: 0.2rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
+.cands__item { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.cands__word { font-weight: 600; min-width: 6rem; }
+.cands__edit, .cands__add { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.cands__edit input, .cands__add input { flex: 1 1 10rem; min-width: 0; }
+.cands__add { margin-top: 0.5rem; }

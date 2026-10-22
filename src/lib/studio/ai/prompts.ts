@@ -85,6 +85,8 @@ ${context ? `\nCurrent set on screen (position: word): ${context.words.map((w) =
 
 CURRENT BRIEF: ${JSON.stringify({ ...JSON.parse(briefText(brief)), approvalPending: brief.approvalPending })}
 
+${brief.candidates.length ? `\nTHE TEACHER'S CURRENT CANDIDATE LIST (they may have edited it by hand; it is authoritative — keep every word, spelling and position unless they ask you to change something): ${JSON.stringify(brief.candidates)}` : ""}${brief.removedCandidates.length ? `\nWORDS THE TEACHER DELETED OR REPLACED (never propose these again): ${JSON.stringify(brief.removedCandidates)}` : ""}
+
 Reply as JSON: {"reply": string, "brief": {"topic": string, "level": "A1"|...|"C2"|null, "objectives": string[], "learnerFocus": string, "balance": string, "numSets": 1-5, "avoid": string[], "wordType": string, "approvalPending": boolean, "candidates": string[], "candidateBands": {"familiar": string[], "moderate": string[], "unfamiliar": string[]}}, "ready": boolean, "command": object|null}`;
   return [
     { role: "system" as const, content: system },

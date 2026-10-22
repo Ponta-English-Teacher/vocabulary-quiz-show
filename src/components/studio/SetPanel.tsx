@@ -26,6 +26,7 @@ export function SetPanel({
   onRegenerateSet,
   onFill,
   onApprove,
+  onReopen,
   onPlay,
   approveProblems,
 }: {
@@ -47,6 +48,7 @@ export function SetPanel({
   onRegenerateSet: (setId: string) => void;
   onFill: (setId: string) => void;
   onApprove: (setId: string) => void;
+  onReopen: (setId: string) => void;
   onPlay: (setId: string) => void;
   approveProblems: string[];
 }) {
@@ -65,7 +67,7 @@ export function SetPanel({
       {sets.length === 0 ? (
         <div className="emptyset">
           <p className="emptyset__big">No words yet.</p>
-          <p>Describe your activity in the writers&apos; room, then press <b>Generate</b>. Ten words appear here for you to review.</p>
+          <p>Describe your activity in the writers&apos; room, then press <b>Generate</b>. Your words appear here for you to review.</p>
         </div>
       ) : (
         <>
@@ -138,7 +140,7 @@ export function SetPanel({
 
           {set.words.length < SET_SIZE ? (
             <p className="short">
-              This set has {set.words.length} of {SET_SIZE} words.{" "}
+              This set has {set.words.length} word{set.words.length === 1 ? "" : "s"} (a set can hold up to {SET_SIZE}; fewer is fine).{" "}
               <button type="button" className="btn btn--small" disabled={disabled || !canGenerate} onClick={() => onFill(set.id)}>
                 Ask AI for {SET_SIZE - set.words.length} more
               </button>
@@ -150,6 +152,7 @@ export function SetPanel({
               <div className="approved">
                 <span className="approved__stamp">✓ Approved</span>
                 <button type="button" className="btn btn--hero btn--inline" onClick={() => onPlay(set.id)}>Play this set</button>
+                <button type="button" className="btn btn--small btn--ghost" disabled={disabled} onClick={() => onReopen(set.id)}>Reopen for editing</button>
               </div>
             ) : (
               <button type="button" className="btn btn--hero btn--inline" disabled={disabled} onClick={() => onApprove(set.id)}>
@@ -175,7 +178,7 @@ export function SetPanel({
           ) : set.status === "draft" && live.length > 0 ? (
             <p className="note">Before approving: {live.length} thing{live.length === 1 ? "" : "s"} to fix (look for ⚠).</p>
           ) : set.status === "draft" ? (
-            <p className="note">Looks ready. Skim all ten, then approve — editing an approved set puts it back to draft.</p>
+            <p className="note">Looks ready. Skim every word, then approve. Once approved, a set stays exactly as it is until you reopen it.</p>
           ) : null}
         </>
       )}

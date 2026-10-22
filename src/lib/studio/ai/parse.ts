@@ -36,6 +36,9 @@ export function sanitizeBrief(raw: unknown, fallback: Brief = EMPTY_BRIEF): Brie
     approvalPending: raw.approvalPending === undefined ? fallback.approvalPending : raw.approvalPending === true,
     wordType: raw.wordType === undefined ? fallback.wordType : clip(raw.wordType, 120),
     ...sanitizeCandidates(raw, fallback),
+    // Which words the teacher typed or deleted by hand: kept from the teacher's own brief, never from the model.
+    pinnedCandidates: fallback.pinnedCandidates,
+    removedCandidates: fallback.removedCandidates,
     // approvedWords is NEVER taken from the model — only the server sets it, on the teacher's approval.
     approvedWords: fallback.approvedWords,
   };
@@ -78,7 +81,15 @@ export function parseChatResult(raw: unknown, prev: Brief): ChatResult {
 export function parseStudioRequest(body: unknown): StudioRequest {
   const bad = (m: string) => new AiError("bad_request", m);
   if (!isObj(body)) throw bad("Request must be a JSON object.");
-  const brief = sanitizeBrief(body.brief, EMPTY_BRIEF);
+  const rawBrief = isObj(body.brief) ? body.brief : {};
+  const brief: Brief = {
+    ...sanitizeBrief(body.brief, EMPTY_BRIEF),
+    // The teacher's brief is the source of truth for the list: words typed by hand are in it but in no familiarity group.
+    ...(Array.isArray(rawBrief.candidates) ? { candidates: strList(rawBrief.candidates, 20, 60) } : {}),
+    // The teacher's own edits to the candidate list travel with their brief (the model never sets these).
+    pinnedCandidates: strList(rawBrief.pinnedCandidates, 40, 60),
+    removedCandidates: strList(rawBrief.removedCandidates, 80, 60),
+  };
   const forceMock = body.forceMock === true;
   const instruction = clip(body.instruction, 300) || undefined;
 

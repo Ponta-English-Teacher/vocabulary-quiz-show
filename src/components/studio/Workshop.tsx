@@ -5,7 +5,7 @@ import type { VocabSet, VocabWord } from "@/data/vocab";
 import { callStudio, StudioClientError } from "@/lib/studio/ai/client";
 import type { StudioData, StudioRequest } from "@/lib/studio/ai/types";
 import {
-  addSet, allTargetForms, appendWords, approveSet, regenerateSet, removeSet, renameActivity,
+  addSet, allTargetForms, appendWords, approveSet, regenerateSet, reopenSet, removeSet, renameActivity,
   replaceWord, setBrief, setHints, setIllustration, splitApproved, toggleLock, toVocabSet, updateWord,
 } from "@/lib/studio/ops";
 import { getBrowserStorage, saveActivity } from "@/lib/studio/storage";
@@ -75,6 +75,13 @@ export function Workshop({
   const findWord = (setId: string, wordId: string): VocabWord | undefined =>
     actRef.current.sets.find((s) => s.id === setId)?.words.find((w) => w.id === wordId);
 
+  /** An approved set only changes after the teacher presses "Reopen for editing". */
+  const frozen = (setId: string): boolean => {
+    if (actRef.current.sets.find((s) => s.id === setId)?.status !== "approved") return false;
+    setNotice({ kind: "info", text: "This set is approved, so it hasn't been changed. Press “Reopen for editing” first if you want to change it." });
+    return true;
+  };
+
   // ---- AI operations (each touches only what it names) -----------------------------
 
   const doGenerate = async (brief: Brief, n: number, instruction?: string) => {
@@ -86,7 +93,9 @@ export function Workshop({
       setBusy(total > 1 ? `Writing set ${i + 1} of ${total}` : "Writing your set");
       const exclude = allTargetForms(actRef.current);
       const approved = chunks[i] ?? [];
-      const { data } = await call("generate", { brief, count: SET_SIZE, exclude, approved, instruction });
+      // A teacher-approved list is written exactly as it is: a short list makes a short set (no padding with words the teacher never chose).
+      const want = approved.length || SET_SIZE;
+      const { data } = await call("generate", { brief, count: want, exclude, approved, instruction });
       if (data.words.length === 0) {
         setNotice({ kind: "error", text: data.issues[0] ?? "No usable words came back. Nothing was changed." });
         break;
@@ -95,16 +104,16 @@ export function Workshop({
       commit(next);
       setActiveSetId(next.sets[next.sets.length - 1].id);
       made++;
-      if (data.words.length < SET_SIZE) {
+      if (data.words.length < want) {
         setNotice({
           kind: "error",
-          text: `I could only produce ${data.words.length} valid words for Set ${next.sets.length} (${SET_SIZE} needed). ${data.issues.length} item${data.issues.length === 1 ? " was" : "s were"} rejected. ${data.issues.slice(0, 2).join(" ")} Use “Ask AI for ${SET_SIZE - data.words.length} more”, or add words by hand.`,
+          text: `I could only produce ${data.words.length} valid words for Set ${next.sets.length} (${want} needed). ${data.issues.length} item${data.issues.length === 1 ? " was" : "s were"} rejected. ${data.issues.slice(0, 2).join(" ")} Use “Ask AI for ${SET_SIZE - data.words.length} more”, or add words by hand.`,
         });
       }
     }
-    if (brief.approvedWords.length || brief.candidates.length) {
+    if (brief.approvedWords.length || brief.candidates.length || brief.pinnedCandidates.length || brief.removedCandidates.length) {
       // The approved list has been used; don't let it leak into later "add set" requests.
-      commit(setBrief(actRef.current, { ...actRef.current.brief, approvedWords: [], candidates: [], candidateBands: { familiar: [], moderate: [], unfamiliar: [] }, approvalPending: false }));
+      commit(setBrief(actRef.current, { ...actRef.current.brief, approvedWords: [], candidates: [], candidateBands: { familiar: [], moderate: [], unfamiliar: [] }, pinnedCandidates: [], removedCandidates: [], approvalPending: false }));
     }
     if (made > 0) {
       setTab("sets");
@@ -207,6 +216,7 @@ export function Workshop({
     const set = actRef.current.sets.find((s) => s.id === activeSetId) ?? actRef.current.sets[0];
     if (cmd.type === "generate") return doGenerate(brief, brief.numSets);
     if (!set) return setNotice({ kind: "info", text: "Generate a set first, then I can change it." });
+    if (frozen(set.id)) return;
     if (cmd.type === "regenerate-set") return doRegenSet(set.id, cmd.instruction);
     const word = set.words[cmd.position - 1];
     if (!word) return setNotice({ kind: "error", text: `There is no word #${cmd.position} in this set.` });
@@ -286,6 +296,7 @@ export function Workshop({
         <ChatPanel
           messages={activity.messages}
           brief={brief}
+          onCandidates={(b) => commit(setBrief(actRef.current, b))}
           busy={busy}
           canGenerate={canGenerate}
           setsLabel={setsLabel}
@@ -293,11 +304,11 @@ export function Workshop({
           onGenerate={() => run("Writing your set", async () => {
             // Pressing Generate is the teacher's approval: release any "discuss first" hold.
             const cur = actRef.current.brief;
-            // Clicking Generate while candidates are on the table approves exactly those candidates.
+            // Clicking Generate while candidates are on the table approves exactly those candidates (including the teacher's own edits).
             const brief = {
               ...cur,
               approvalPending: false,
-              approvedWords: cur.approvalPending && cur.candidates.length ? cur.candidates : cur.approvedWords,
+              approvedWords: cur.candidates.length ? cur.candidates : cur.approvedWords,
             };
             commit(setBrief(actRef.current, brief));
             await doGenerate(brief, brief.numSets);
@@ -316,15 +327,16 @@ export function Workshop({
             commit(next);
             setActiveSetId(next.sets[0]?.id ?? null);
           }}
-          onEdit={(s, w, patch) => commit(updateWord(actRef.current, s, w, patch))}
+          onEdit={(s, w, patch) => { if (!frozen(s)) commit(updateWord(actRef.current, s, w, patch)); }}
           onToggleLock={(s, w) => commit(toggleLock(actRef.current, s, w))}
-          onReplace={(s, w, ins) => run("Finding a replacement", () => doReplace(s, w, ins))}
-          onNewHints={(s, w, ins) => run("Writing new hints", () => doHints(s, w, ins))}
+          onReplace={(s, w, ins) => { if (!frozen(s)) void run("Finding a replacement", () => doReplace(s, w, ins)); }}
+          onNewHints={(s, w, ins) => { if (!frozen(s)) void run("Writing new hints", () => doHints(s, w, ins)); }}
           onIllustrate={(s, w) => run("Drawing a picture", () => doIllustrate(s, w))}
           onIllustrateAll={(s) => run("Drawing pictures", () => doIllustrateAll(s))}
           onRemoveIllustration={(s, w) => commit(setIllustration(actRef.current, s, w, undefined))}
-          onRegenerateSet={(s) => run("Regenerating the set", () => doRegenSet(s))}
-          onFill={(s) => run("Finding more words", () => doFill(s))}
+          onRegenerateSet={(s) => { if (!frozen(s)) void run("Regenerating the set", () => doRegenSet(s)); }}
+          onFill={(s) => { if (!frozen(s)) void run("Finding more words", () => doFill(s)); }}
+          onReopen={(s) => { commit(reopenSet(actRef.current, s)); setNotice({ kind: "info", text: "Reopened. You can edit this set now; approve it again when you're happy." }); }}
           onApprove={(s) => {
             const r = approveSet(actRef.current, s);
             if (r.problems.length) return setApproveProblems(r.problems);

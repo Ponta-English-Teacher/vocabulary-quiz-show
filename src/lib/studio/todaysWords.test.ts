@@ -26,10 +26,12 @@ describe("Today's Words (classroom hosting)", () => {
     const draft = { ...createActivity("Draft", "2026-01-01T00:00:00Z"), sets: [createSet(distinctive("zz"), "Set 1")] };
     expect(todaysWords([draft])).toBeNull();
   });
-  it("an approved set that is no longer complete does not qualify", () => {
+  it("an approved set with no words does not qualify, but a smaller approved set does", () => {
     const a = approvedActivity("T", "qq", "2026-01-01T00:00:00Z");
-    const short = { ...a, sets: [{ ...a.sets[0], words: a.sets[0].words.slice(0, 9) }] };
-    expect(todaysWords([short])).toBeNull();
+    const empty = { ...a, sets: [{ ...a.sets[0], words: [] }] };
+    expect(todaysWords([empty])).toBeNull();
+    const short = { ...a, sets: [{ ...a.sets[0], words: a.sets[0].words.slice(0, 4) }] };
+    expect(todaysWords([short])?.words).toHaveLength(4);
   });
   it("returns the exact approved words of the newest approved activity, separate from the preset", () => {
     const old = approvedActivity("Old", "old", "2026-01-01T00:00:00Z");

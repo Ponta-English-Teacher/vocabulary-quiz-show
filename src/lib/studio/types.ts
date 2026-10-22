@@ -23,6 +23,10 @@ export interface Brief {
   candidates: string[];
   /** The same candidates grouped by familiarity (the teacher's/learners' sense of it — NOT CEFR cut-offs). */
   candidateBands: CandidateBands;
+  /** Candidate words the teacher added or typed by hand. The AI may never drop them when the conversation continues. */
+  pinnedCandidates: string[];
+  /** Candidate words the teacher deleted or replaced. The AI may never put them back. */
+  removedCandidates: string[];
   /** Set by the SERVER when the teacher approves: the exact words generation must use, unchanged. */
   approvedWords: string[];
 }
@@ -46,10 +50,16 @@ export const EMPTY_BRIEF: Brief = {
   wordType: "",
   candidates: [],
   candidateBands: { familiar: [], moderate: [], unfamiliar: [] },
+  pinnedCandidates: [],
+  removedCandidates: [],
   approvedWords: [],
 };
 
+/** The most words in one set (and the size of a full AI-written set). A set may hold anything from MIN_SET_WORDS to SET_SIZE. */
 export const SET_SIZE = 10;
+export const MIN_SET_WORDS = 1;
+/** The most candidate words on the table at once. */
+export const MAX_CANDIDATES = 20;
 export const MAX_SETS_PER_REQUEST = 5;
 
 export interface ChatMessage {

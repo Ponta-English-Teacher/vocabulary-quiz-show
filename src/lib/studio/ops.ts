@@ -1,7 +1,7 @@
 import { SAMPLE_SET, type Illustration, type VocabSet, type VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
 import { newId } from "./ids";
-import { EMPTY_BRIEF, SET_SIZE, type Activity, type Brief, type StudioSet } from "./types";
+import { EMPTY_BRIEF, MIN_SET_WORDS, SET_SIZE, type Activity, type Brief, type StudioSet } from "./types";
 import { hasErrors, validateWord } from "./validation";
 
 /**
@@ -185,7 +185,7 @@ export function removeSet(a: Activity, setId: string): Activity {
 /** Reasons a set cannot be approved yet (empty array = ready). */
 export function approvalProblems(set: StudioSet): string[] {
   const problems: string[] = [];
-  if (set.words.length !== SET_SIZE) problems.push(`A set needs exactly ${SET_SIZE} words (this one has ${set.words.length}).`);
+  if (set.words.length < MIN_SET_WORDS || set.words.length > SET_SIZE) problems.push(`A set needs ${MIN_SET_WORDS} to ${SET_SIZE} words (this one has ${set.words.length}).`);
   const seen = new Set<string>();
   set.words.forEach((w, i) => {
     const key = normalize(w.word);
@@ -195,6 +195,13 @@ export function approvalProblems(set: StudioSet): string[] {
     if (hasErrors(errs)) problems.push(`Word ${i + 1} (“${w.word || "empty"}”): ${errs.map((e) => e.message).join(" ")}`);
   });
   return problems;
+}
+
+/** The teacher explicitly reopens an approved set for editing. Nothing else ever changes an approved set's status. */
+export function reopenSet(a: Activity, setId: string): Activity {
+  const set = a.sets.find((s) => s.id === setId);
+  if (!set || set.status !== "approved") return a;
+  return mapSet(a, setId, (s) => ({ ...s, status: "draft" }));
 }
 
 export function approveSet(a: Activity, setId: string): { activity: Activity; problems: string[] } {
@@ -244,7 +251,7 @@ export function appendWords(a: Activity, setId: string, words: VocabWord[]): Act
 
 /**
  * Split the teacher-approved word list into per-set chunks of up to `size` words, in order.
- * Generation then uses each chunk exactly; any shortfall in a set is filled freely.
+ * Generation then uses each chunk exactly; a chunk may hold fewer than `size` words (the set is then that small).
  */
 export function splitApproved(approved: string[], size = SET_SIZE): string[][] {
   const out: string[][] = [];

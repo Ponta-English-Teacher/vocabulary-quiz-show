@@ -50,6 +50,8 @@ function parseBrief(raw: unknown): Brief {
       const b = isObj(raw.candidateBands) ? raw.candidateBands : {};
       return { familiar: strs(b.familiar), moderate: strs(b.moderate), unfamiliar: strs(b.unfamiliar) };
     })(),
+    pinnedCandidates: strs(raw.pinnedCandidates),
+    removedCandidates: strs(raw.removedCandidates),
     approvedWords: strs(raw.approvedWords),
   };
 }

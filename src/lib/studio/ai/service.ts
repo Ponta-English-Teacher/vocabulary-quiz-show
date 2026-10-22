@@ -3,6 +3,8 @@ import { normalize } from "@/lib/answer";
 import { parseGeneratedWords } from "../validation";
 import { mockApproved, mockChat, mockGenerate, mockHints, mockReplace } from "./mock";
 import { callOpenAIJson, DEFAULT_MODEL, type FetchLike } from "./openai";
+import { mergeAiCandidates } from "../candidates";
+import type { Brief, ChatResult } from "../types";
 import { enforceApproval, enforceMixture, parseChatResult, parseHints, parseStudioRequest } from "./parse";
 import { approvedPrompt, chatPrompt, generatePrompt, hintsPrompt, replacePrompt } from "./prompts";
 import { AiError, type AiMode, type StudioData, type StudioRequest, type StudioResponse } from "./types";
@@ -49,13 +51,18 @@ export async function handleStudioRequest(body: unknown, deps: ServiceDeps): Pro
   }
 }
 
+/** The AI's candidate list is combined with the teacher's hand edits BEFORE approval is checked, so "go ahead" uses the teacher's exact list. */
+function keepTeacherWords(result: ChatResult, prev: Brief): ChatResult {
+  return { ...result, brief: mergeAiCandidates(prev, result.brief) };
+}
+
 function runMock(req: StudioRequest, deps: ServiceDeps): StudioData {
   const rng = deps.rng ?? Math.random;
   switch (req.task) {
     case "chat":
       {
       const last = req.messages[req.messages.length - 1].text;
-      return { task: "chat", result: enforceMixture(enforceApproval(mockChat(req.messages, req.brief, req.context), req.brief, last), last) };
+      return { task: "chat", result: enforceMixture(enforceApproval(keepTeacherWords(mockChat(req.messages, req.brief, req.context), req.brief), req.brief, last), last) };
     }
     case "generate": {
       const approved = (req.approved ?? []).slice(0, req.count);
@@ -83,7 +90,7 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
     case "chat": {
       const raw = await callOpenAIJson(cfg, chatPrompt(req.messages, req.brief, req.context));
       const last = req.messages[req.messages.length - 1].text;
-      return { task: "chat", result: enforceMixture(enforceApproval(parseChatResult(raw, req.brief), req.brief, last), last) };
+      return { task: "chat", result: enforceMixture(enforceApproval(keepTeacherWords(parseChatResult(raw, req.brief), req.brief), req.brief, last), last) };
     }
 
     case "generate": {

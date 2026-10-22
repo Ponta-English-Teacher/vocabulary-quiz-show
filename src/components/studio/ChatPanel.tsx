@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Brief, ChatMessage } from "@/lib/studio/types";
+import { CandidateEditor } from "./CandidateEditor";
 
 const IDEAS = [
   "Create A1 vocabulary about common fruits.",
@@ -13,6 +14,7 @@ const IDEAS = [
 export function ChatPanel({
   messages,
   brief,
+  onCandidates,
   busy,
   canGenerate,
   setsLabel,
@@ -21,6 +23,7 @@ export function ChatPanel({
 }: {
   messages: ChatMessage[];
   brief: Brief;
+  onCandidates: (b: Brief) => void;
   busy: string | null;
   canGenerate: boolean;
   setsLabel: string;
@@ -58,19 +61,7 @@ export function ChatPanel({
         </p>
       ) : null}
 
-      {brief.approvalPending && brief.candidates.length > 0 ? (
-        <div className="brief brief--candidates" aria-label="Candidate words">
-          {brief.candidateBands.familiar.length + brief.candidateBands.moderate.length + brief.candidateBands.unfamiliar.length > 0 ? (
-            ([["familiar", "Familiar"], ["moderate", "Moderately challenging"], ["unfamiliar", "Unfamiliar"]] as const).map(([k, label]) =>
-              brief.candidateBands[k].length ? (
-                <p key={k}><span className="brief__label">{label}</span> {brief.candidateBands[k].join(", ")}</p>
-              ) : null,
-            )
-          ) : (
-            <p><span className="brief__label">Candidates</span> {brief.candidates.join(", ")}</p>
-          )}
-        </div>
-      ) : null}
+      {brief.candidates.length > 0 ? <CandidateEditor brief={brief} busy={!!busy} onChange={onCandidates} /> : null}
 
       <div className="chat" ref={logRef} role="log" aria-live="polite" aria-label="Conversation">
         {messages.length === 0 ? (
@@ -129,7 +120,7 @@ export function ChatPanel({
         <div className="composer__row">
           <button type="button" className="btn btn--small" onClick={onGenerate} disabled={!canGenerate || !!busy}
             title={canGenerate ? undefined : "Tell me a topic first"}>
-            Generate {setsLabel}
+            {brief.candidates.length > 0 ? `Generate from my ${brief.candidates.length} word${brief.candidates.length === 1 ? "" : "s"}` : `Generate ${setsLabel}`}
           </button>
           <button type="submit" className="btn btn--small btn--send" disabled={!text.trim() || !!busy}>Send</button>
         </div>

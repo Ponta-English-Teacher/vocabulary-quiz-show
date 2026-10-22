@@ -82,7 +82,7 @@ export function HostClass() {
             {today ? <><b>Today&apos;s Words</b> — {today.title} · {today.words.length} words</> : <><b>Today&apos;s Words</b> — Not available yet.</>}
           </span>
         </label>
-        {!today ? <p className="note">Approve a complete 10-word set in Teacher Studio to make it available here.</p> : null}
+        {!today ? <p className="note">Approve a set (1–10 words) in Teacher Studio to make it available here.</p> : null}
       </fieldset>
       {set ? (
         <>
