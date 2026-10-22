@@ -5,7 +5,7 @@ import { mockApproved, mockChat, mockGenerate, mockHints, mockReplace } from "./
 import { callOpenAIJson, DEFAULT_MODEL, type FetchLike } from "./openai";
 import { mergeAiCandidates } from "../candidates";
 import type { Brief, ChatResult } from "../types";
-import { enforceApproval, enforceMixture, parseChatResult, parseHints, parseStudioRequest } from "./parse";
+import { APPROVAL_RE, DISCUSS_FIRST_RE, enforceApproval, enforceMixture, parseChatResult, parseHints, parseStudioRequest } from "./parse";
 import { approvedPrompt, chatPrompt, generatePrompt, hintsPrompt, replacePrompt } from "./prompts";
 import { AiError, type AiMode, type StudioData, type StudioRequest, type StudioResponse } from "./types";
 
@@ -52,9 +52,19 @@ export async function handleStudioRequest(body: unknown, deps: ServiceDeps): Pro
 }
 
 /** The AI's candidate list is combined with the teacher's hand edits BEFORE approval is checked, so "go ahead" uses the teacher's exact list. */
-function keepTeacherWords(result: ChatResult, prev: Brief): ChatResult {
-  return { ...result, brief: mergeAiCandidates(prev, result.brief) };
+function keepTeacherWords(result: ChatResult, prev: Brief, lastTeacherText = ""): ChatResult {
+  const merged = mergeAiCandidates(prev, result.brief);
+  // A plain "go ahead" must approve the list the teacher was shown. If the model's list came back shorter without the
+  // teacher asking for any change, that is the model's slip, not the teacher's decision: keep the shown list.
+  const plainApproval = prev.candidates.length > 0 && APPROVAL_RE.test(lastTeacherText) && !DISCUSS_FIRST_RE.test(lastTeacherText) && !CHANGE_RE.test(lastTeacherText);
+  if (plainApproval && merged.candidates.length < prev.candidates.length) {
+    return { ...result, brief: { ...merged, candidates: prev.candidates, candidateBands: prev.candidateBands, pinnedCandidates: prev.pinnedCandidates, removedCandidates: prev.removedCandidates } };
+  }
+  return { ...result, brief: merged };
 }
+
+/** The teacher is asking to change the list, so a different list from the model is expected. */
+const CHANGE_RE = /\b(remove|drop|delete|swap|replace|instead|without|exclude|cut|take out|get rid|fewer|add|include|also)\b/i;
 
 function runMock(req: StudioRequest, deps: ServiceDeps): StudioData {
   const rng = deps.rng ?? Math.random;
@@ -62,7 +72,7 @@ function runMock(req: StudioRequest, deps: ServiceDeps): StudioData {
     case "chat":
       {
       const last = req.messages[req.messages.length - 1].text;
-      return { task: "chat", result: enforceMixture(enforceApproval(keepTeacherWords(mockChat(req.messages, req.brief, req.context), req.brief), req.brief, last), last) };
+      return { task: "chat", result: enforceMixture(enforceApproval(keepTeacherWords(mockChat(req.messages, req.brief, req.context), req.brief, last), req.brief, last), last) };
     }
     case "generate": {
       const approved = (req.approved ?? []).slice(0, req.count);
@@ -74,7 +84,8 @@ function runMock(req: StudioRequest, deps: ServiceDeps): StudioData {
       const issues = [...fromList.issues];
       if (words.length < req.count) issues.push(`Mock AI only had ${words.length} demo words for this request.`);
       if (words.length === 0) throw new AiError("unsupported", issues.join(" ") || "Mock AI has no demo words for this.");
-      return { task: "generate", words, requested: req.count, issues };
+      const failed = approved.filter((w) => !fromList.words.some((f) => normalize(f.word) === normalize(w))).map((w) => ({ word: w, reason: "Mock AI has no demo entry for this word (real AI can write any word)." }));
+      return { task: "generate", words, requested: req.count, issues, ...(failed.length ? { failed } : {}) };
     }
     case "replace-word":
       return { task: "replace-word", word: mockReplace(req.brief, req.current, req.exclude, rng) };
@@ -90,13 +101,15 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
     case "chat": {
       const raw = await callOpenAIJson(cfg, chatPrompt(req.messages, req.brief, req.context));
       const last = req.messages[req.messages.length - 1].text;
-      return { task: "chat", result: enforceMixture(enforceApproval(keepTeacherWords(parseChatResult(raw, req.brief), req.brief), req.brief, last), last) };
+      return { task: "chat", result: enforceMixture(enforceApproval(keepTeacherWords(parseChatResult(raw, req.brief), req.brief, last), req.brief, last), last) };
     }
 
     case "generate": {
       const issues: string[] = [];
       const required = uniqueWords(req.approved ?? []).slice(0, req.count);
       const found: VocabWord[] = [];
+      let failed: { word: string; reason: string }[] = [];
+      const reasons = new Map<string, string>(); // approved word → why it was rejected last time
 
       // 1) Teacher-approved words: write items for EXACTLY these words (unchanged), retrying only what is missing.
       if (required.length > 0) {
@@ -116,6 +129,7 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
           }
           const parsed = parseGeneratedWords((raw as { words?: unknown })?.words, { exclude: found.map((w) => w.word) });
           issues.push(...parsed.issues);
+          for (const r of parsed.rejected) if (missing.some((m) => normalize(m) === normalize(r.word))) reasons.set(normalize(r.word), r.reason);
           for (const w of parsed.words) {
             const target = missing.find((m) => normalize(m) === normalize(w.word));
             if (target && !found.some((f) => normalize(f.word) === normalize(target))) found.push({ ...w, word: target });
@@ -126,6 +140,7 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
         found.sort((a, b) => required.findIndex((r) => normalize(r) === normalize(a.word)) - required.findIndex((r) => normalize(r) === normalize(b.word)));
         const stillMissing = required.filter((w) => !found.some((f) => normalize(f.word) === normalize(w)));
         if (stillMissing.length) issues.push(`Could not write valid items for approved word${stillMissing.length === 1 ? "" : "s"}: ${stillMissing.join(", ")}.`);
+        failed = stillMissing.map((w) => ({ word: w, reason: reasons.get(normalize(w)) ?? "The AI did not return an item for this word." }));
       }
 
       // 2) Anything beyond the approved list (or the whole set when nothing was approved) is generated freely.
@@ -136,7 +151,7 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
         issues.push(...free.issues);
       }
       if (found.length === 0) throw new AiError("malformed", "The AI did not return any usable vocabulary. Nothing was changed.");
-      return { task: "generate", words: found, issues, requested: req.count };
+      return { task: "generate", words: found, issues, requested: req.count, ...(failed.length ? { failed } : {}) };
     }
 
     case "replace-word": {

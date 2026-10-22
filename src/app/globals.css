@@ -664,3 +664,6 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .cands__edit, .cands__add { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 .cands__edit input, .cands__add input { flex: 1 1 10rem; min-width: 0; }
 .cands__add { margin-top: 0.5rem; }
+.progress { margin: 0.5rem 0; padding: 0.5rem 0.7rem; border: 1px solid var(--line); border-radius: 0.6rem; }
+.progress--bad { border-color: var(--gold, #f5c451); }
+.progress p { margin: 0.2rem 0; }

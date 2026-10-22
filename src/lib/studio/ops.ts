@@ -1,7 +1,7 @@
 import { SAMPLE_SET, type Illustration, type VocabSet, type VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
 import { newId } from "./ids";
-import { EMPTY_BRIEF, MIN_SET_WORDS, SET_SIZE, type Activity, type Brief, type StudioSet } from "./types";
+import { EMPTY_BRIEF, MIN_SET_WORDS, SET_SIZE, type Activity, type Brief, type MissingItem, type StudioSet } from "./types";
 import { hasErrors, validateWord } from "./validation";
 
 /**
@@ -173,9 +173,52 @@ export function regenerateSet(
   return { activity, replaced };
 }
 
-export function addSet(a: Activity, words: VocabWord[]): Activity {
+export function addSet(a: Activity, words: VocabWord[], opts: { requested?: number; missing?: MissingItem[] } = {}): Activity {
   const title = `Set ${a.sets.length + 1}`;
-  return touch({ ...a, sets: [...a.sets, createSet(words, title)] });
+  const set = createSet(words, title);
+  if (opts.requested !== undefined) set.requested = opts.requested;
+  if (opts.missing?.length) set.missing = opts.missing;
+  return touch({ ...a, sets: [...a.sets, set] });
+}
+
+/** Counts for "9 approved · 7 written · 2 failed". Sets made before this feature have no record of failures. */
+export function setProgress(set: StudioSet): { approved: number; written: number; failed: number } {
+  const failed = set.missing?.length ?? 0;
+  return { approved: set.requested ?? set.words.length + failed, written: set.words.length, failed };
+}
+
+/** A retry produced the missing word's item: put it back where it belongs. Every other word is untouched. */
+export function fillMissing(a: Activity, setId: string, word: string, item: VocabWord): { activity: Activity; error?: string } {
+  const set = a.sets.find((s) => s.id === setId);
+  const miss = set?.missing?.find((m) => normalize(m.word) === normalize(word));
+  if (!set || !miss) return { activity: a, error: "That word is no longer waiting for an item." };
+  if (set.words.some((w) => normalize(w.word) === normalize(item.word))) return { activity: a, error: `“${item.word}” is already in this set.` };
+  const fresh: VocabWord = { ...item, id: newId("w") };
+  return {
+    activity: mapSet(a, setId, (s) => {
+      const words = [...s.words];
+      words.splice(Math.min(miss.index, words.length), 0, fresh);
+      const left = (s.missing ?? []).filter((m) => normalize(m.word) !== normalize(word));
+      const { missing: _m, ...rest } = s;
+      void _m;
+      return edited({ ...rest, ...(left.length ? { missing: left } : {}) }, words);
+    }),
+  };
+}
+
+/** A retry failed again: keep the word waiting, with the new reason. */
+export function noteMissingFailure(a: Activity, setId: string, word: string, reason: string): Activity {
+  return mapSet(a, setId, (s) => ({ ...s, missing: (s.missing ?? []).map((m) => (normalize(m.word) === normalize(word) ? { ...m, reason } : m)) }));
+}
+
+/** The teacher decides to give up on one word. Only this explicit action removes it. */
+export function dropMissing(a: Activity, setId: string, word: string): Activity {
+  return mapSet(a, setId, (s) => {
+    const left = (s.missing ?? []).filter((m) => normalize(m.word) !== normalize(word));
+    const { missing: _m, ...rest } = s;
+    void _m;
+    return { ...rest, ...(left.length ? { missing: left } : {}), ...(s.requested !== undefined ? { requested: Math.max(s.words.length, s.requested - 1) } : {}) };
+  });
 }
 
 export function removeSet(a: Activity, setId: string): Activity {
@@ -186,6 +229,9 @@ export function removeSet(a: Activity, setId: string): Activity {
 export function approvalProblems(set: StudioSet): string[] {
   const problems: string[] = [];
   if (set.words.length < MIN_SET_WORDS || set.words.length > SET_SIZE) problems.push(`A set needs ${MIN_SET_WORDS} to ${SET_SIZE} words (this one has ${set.words.length}).`);
+  if (set.missing?.length) {
+    problems.push(`${set.missing.length} approved word${set.missing.length === 1 ? " has" : "s have"} no item yet: ${set.missing.map((m) => `“${m.word}”`).join(", ")}. Retry ${set.missing.length === 1 ? "it" : "them"} or remove ${set.missing.length === 1 ? "it" : "them"} from the set first.`);
+  }
   const seen = new Set<string>();
   set.words.forEach((w, i) => {
     const key = normalize(w.word);

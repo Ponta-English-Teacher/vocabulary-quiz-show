@@ -18,7 +18,11 @@ export type AiMode = "openai" | "mock";
 
 export type StudioData =
   | { task: "chat"; result: ChatResult }
-  | { task: "generate"; words: VocabWord[]; issues: string[]; requested: number }
+  | {
+      task: "generate"; words: VocabWord[]; issues: string[]; requested: number;
+      /** Teacher-approved words that could NOT be written, each with the reason. Never silently dropped. */
+      failed?: { word: string; reason: string }[];
+    }
   | { task: "replace-word"; word: VocabWord }
   | { task: "regenerate-hints"; hints: [string, string, string] };
 

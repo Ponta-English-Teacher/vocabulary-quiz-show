@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { VocabWord } from "@/data/vocab";
-import { approvalProblems, levelMix, mixAdvice } from "@/lib/studio/ops";
+import { approvalProblems, levelMix, mixAdvice, setProgress } from "@/lib/studio/ops";
 import { SET_SIZE, type StudioSet } from "@/lib/studio/types";
 import { ConfirmButton } from "./shared";
 import { WordRow } from "./WordRow";
@@ -27,6 +27,8 @@ export function SetPanel({
   onFill,
   onApprove,
   onReopen,
+  onRetryMissing,
+  onDropMissing,
   onPlay,
   approveProblems,
 }: {
@@ -49,6 +51,8 @@ export function SetPanel({
   onFill: (setId: string) => void;
   onApprove: (setId: string) => void;
   onReopen: (setId: string) => void;
+  onRetryMissing: (setId: string, word: string) => void;
+  onDropMissing: (setId: string, word: string) => void;
   onPlay: (setId: string) => void;
   approveProblems: string[];
 }) {
@@ -89,6 +93,25 @@ export function SetPanel({
               + Add set
             </button>
           </div>
+
+          {(() => {
+            const p = setProgress(set);
+            if (set.requested === undefined && !p.failed) return null;
+            return (
+              <div className={`progress ${p.failed ? "progress--bad" : ""}`} role="status" aria-label="Generation progress">
+                <p>
+                  <b>{p.approved}</b> approved · <b>{p.written}</b> written · <b className={p.failed ? "c-gold" : ""}>{p.failed}</b> failed
+                </p>
+                {(set.missing ?? []).map((m) => (
+                  <p key={m.word} className="progress__miss">
+                    <b>“{m.word}”</b> has no item yet — {m.reason}{" "}
+                    <button type="button" className="btn btn--small" disabled={disabled || !canGenerate} onClick={() => onRetryMissing(set.id, m.word)}>Retry this word</button>{" "}
+                    <button type="button" className="btn btn--small btn--ghost" disabled={disabled} onClick={() => onDropMissing(set.id, m.word)}>Remove it from the set</button>
+                  </p>
+                ))}
+              </div>
+            );
+          })()}
 
           <p className="mix" aria-label="Difficulty mix">
             <span className="mix__label">Mix</span>{" "}

@@ -73,6 +73,13 @@ export function parseActivity(raw: unknown): Activity | null {
       title: text(s.title, "Set"),
       status: s.status === "approved" ? "approved" : "draft",
       words,
+      ...(typeof s.requested === "number" && Number.isFinite(s.requested) ? { requested: Math.max(0, Math.round(s.requested)) } : {}),
+      ...(() => {
+        const missing = Array.isArray(s.missing)
+          ? s.missing.flatMap((m, i) => (isObj(m) && typeof m.word === "string" && m.word.trim() ? [{ word: m.word.trim().slice(0, 60), reason: text(m.reason, "No item was written for this word."), index: typeof m.index === "number" ? Math.max(0, Math.round(m.index)) : i }] : []))
+          : [];
+        return missing.length ? { missing } : {};
+      })(),
       lockedIds: Array.isArray(s.lockedIds) ? s.lockedIds.filter((x): x is string => typeof x === "string") : [],
     });
   }

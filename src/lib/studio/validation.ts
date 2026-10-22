@@ -297,6 +297,8 @@ export interface ParsedWords {
   words: VocabWord[];
   /** Human-readable reasons why items were rejected. */
   issues: string[];
+  /** The same rejections, tied to the word they were about (when the item named one). */
+  rejected: { word: string; reason: string }[];
 }
 
 /** Validate a whole AI list: shape, content rules, duplicates (also against `exclude`). */
@@ -306,15 +308,18 @@ export function parseGeneratedWords(
 ): ParsedWords {
   const expected = ctx.topic ? expectedPartsOfSpeech(ctx.topic, ctx.wordType) : null;
   const issues: string[] = [];
-  if (!Array.isArray(raw)) return { words: [], issues: ["The AI did not return a list of words."] };
+  if (!Array.isArray(raw)) return { words: [], issues: ["The AI did not return a list of words."], rejected: [] };
 
   const taken = new Set((ctx.exclude ?? []).map(normalize));
   const words: VocabWord[] = [];
+  const rejected: { word: string; reason: string }[] = [];
   raw.forEach((item, i) => {
     const label = `Item ${i + 1}`;
     const coerced = coerceWord(item);
     if ("errors" in coerced) {
       issues.push(`${label}: ${coerced.errors.join(", ")}.`);
+      const named = item && typeof item === "object" && typeof (item as { word?: unknown }).word === "string" ? (item as { word: string }).word.trim() : "";
+      if (named) rejected.push({ word: named, reason: `${coerced.errors.join(", ")}.` });
       return;
     }
     const w = coerced.word;
@@ -322,20 +327,23 @@ export function parseGeneratedWords(
     const problems = validateWord(w).filter((p) => p.severity === "error" || p.code === "letter-only" || p.code === "vague-opening");
     if (problems.length) {
       issues.push(`${label} (“${w.word}”): ${problems.map((p) => p.message).join(" ")}`);
+      rejected.push({ word: w.word, reason: problems.map((p) => p.message).join(" ") });
       return;
     }
     // Topic accuracy: "kitchen tools" must not turn into cooking verbs (and vice versa).
     if (expected && !expected.allowed.includes(w.partOfSpeech)) {
       issues.push(`${label} (“${w.word}”): this is a ${w.partOfSpeech}, but the requested topic “${ctx.topic}” asks for ${expected.label}.`);
+      rejected.push({ word: w.word, reason: `this is a ${w.partOfSpeech}, but the requested topic “${ctx.topic}” asks for ${expected.label}.` });
       return;
     }
     const forms = [w.word, ...(w.accept ?? [])].map(normalize);
     if (forms.some((f) => taken.has(f))) {
       issues.push(`${label} (“${w.word}”): duplicate word.`);
+      rejected.push({ word: w.word, reason: "duplicate word (it, or one of its accepted spellings, matches another word)." });
       return;
     }
     forms.forEach((f) => taken.add(f));
     if (ctx.max === undefined || words.length < ctx.max) words.push(w);
   });
-  return { words, issues };
+  return { words, issues, rejected };
 }

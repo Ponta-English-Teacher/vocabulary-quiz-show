@@ -5,9 +5,10 @@ import type { VocabSet, VocabWord } from "@/data/vocab";
 import { callStudio, StudioClientError } from "@/lib/studio/ai/client";
 import type { StudioData, StudioRequest } from "@/lib/studio/ai/types";
 import {
-  addSet, allTargetForms, appendWords, approveSet, regenerateSet, reopenSet, removeSet, renameActivity,
+  addSet, allTargetForms, appendWords, approveSet, dropMissing, fillMissing, noteMissingFailure, regenerateSet, reopenSet, removeSet, renameActivity,
   replaceWord, setBrief, setHints, setIllustration, splitApproved, toggleLock, toVocabSet, updateWord,
 } from "@/lib/studio/ops";
+import { normalize } from "@/lib/answer";
 import { getBrowserStorage, saveActivity } from "@/lib/studio/storage";
 import { requestIllustration } from "@/lib/studio/illustrateClient";
 import { SET_SIZE, type Activity, type Brief, type StudioCommand } from "@/lib/studio/types";
@@ -86,6 +87,7 @@ export function Workshop({
 
   const doGenerate = async (brief: Brief, n: number, instruction?: string) => {
     let made = 0;
+    let failedAll = false;
     // Words the teacher approved are used exactly, ten per set; anything left over goes to the next set.
     const chunks = splitApproved(brief.approvedWords);
     const total = Math.max(n, chunks.length);
@@ -98,19 +100,30 @@ export function Workshop({
       const { data } = await call("generate", { brief, count: want, exclude, approved, instruction });
       if (data.words.length === 0) {
         setNotice({ kind: "error", text: data.issues[0] ?? "No usable words came back. Nothing was changed." });
+        failedAll = true;
         break;
       }
-      const next = addSet(actRef.current, data.words);
+      // Every approved word is accounted for: written, or recorded as missing WITH the reason. Nothing disappears silently.
+      const missing = (data.failed ?? []).map((f) => ({ word: f.word, reason: f.reason, index: Math.max(0, approved.findIndex((x) => normalize(x) === normalize(f.word))) }));
+      const next = addSet(actRef.current, data.words, approved.length ? { requested: approved.length, missing } : {});
       commit(next);
       setActiveSetId(next.sets[next.sets.length - 1].id);
       made++;
-      if (data.words.length < want) {
+      if (missing.length) {
+        setNotice({
+          kind: "error",
+          text: `Wrote ${data.words.length} of your ${approved.length} words for Set ${next.sets.length}. ${missing.length} need${missing.length === 1 ? "s" : ""} attention: ${missing.map((m) => `“${m.word}” — ${m.reason}`).join(" ")} Your other words are safe: use “Retry this word” on the lineup. The set can't be approved until each one is written or removed.`,
+        });
+      } else if (data.words.length < want) {
         setNotice({
           kind: "error",
           text: `I could only produce ${data.words.length} valid words for Set ${next.sets.length} (${want} needed). ${data.issues.length} item${data.issues.length === 1 ? " was" : "s were"} rejected. ${data.issues.slice(0, 2).join(" ")} Use “Ask AI for ${SET_SIZE - data.words.length} more”, or add words by hand.`,
         });
       }
     }
+    // The approved list now lives in the set (written items plus any recorded as missing), so the candidate list can be cleared.
+    // If nothing could be written at all, the list is KEPT so the teacher can simply try again.
+    if (failedAll && made === 0) return;
     if (brief.approvedWords.length || brief.candidates.length || brief.pinnedCandidates.length || brief.removedCandidates.length) {
       // The approved list has been used; don't let it leak into later "add set" requests.
       commit(setBrief(actRef.current, { ...actRef.current.brief, approvedWords: [], candidates: [], candidateBands: { familiar: [], moderate: [], unfamiliar: [] }, pinnedCandidates: [], removedCandidates: [], approvalPending: false }));
@@ -119,6 +132,22 @@ export function Workshop({
       setTab("sets");
       aiSay(`Here ${made === 1 ? "is your set" : `are your ${made} sets`}. Skim every word, open any item to edit it, and approve when you're happy. Tell me what to change — for example “replace #4 with something less common”.`);
     }
+  };
+
+  /** Retry ONE missing word. The words already written are not touched or regenerated. */
+  const doRetryMissing = async (setId: string, word: string) => {
+    setBusy(`Writing “${word}”`);
+    const { data } = await call("generate", { brief: actRef.current.brief, count: 1, exclude: allTargetForms(actRef.current), approved: [word] });
+    const item = data.words[0];
+    if (!item) {
+      const reason = data.failed?.[0]?.reason ?? data.issues[0] ?? "The AI did not return a usable item.";
+      commit(noteMissingFailure(actRef.current, setId, word, reason));
+      return setNotice({ kind: "error", text: `Still no item for “${word}” — ${reason} Everything else is unchanged. You can try again or remove it from the set.` });
+    }
+    const r = fillMissing(actRef.current, setId, word, item);
+    if (r.error) return setNotice({ kind: "error", text: r.error });
+    commit(r.activity);
+    setNotice({ kind: "info", text: `Wrote “${word}”. The other words weren't touched.` });
   };
 
   const doReplace = async (setId: string, wordId: string, instruction?: string) => {
@@ -336,6 +365,8 @@ export function Workshop({
           onRemoveIllustration={(s, w) => commit(setIllustration(actRef.current, s, w, undefined))}
           onRegenerateSet={(s) => { if (!frozen(s)) void run("Regenerating the set", () => doRegenSet(s)); }}
           onFill={(s) => { if (!frozen(s)) void run("Finding more words", () => doFill(s)); }}
+          onRetryMissing={(s, word) => { if (!frozen(s)) void run(`Writing “${word}”`, () => doRetryMissing(s, word)); }}
+          onDropMissing={(s, word) => { if (!frozen(s)) commit(dropMissing(actRef.current, s, word)); }}
           onReopen={(s) => { commit(reopenSet(actRef.current, s)); setNotice({ kind: "info", text: "Reopened. You can edit this set now; approve it again when you're happy." }); }}
           onApprove={(s) => {
             const r = approveSet(actRef.current, s);

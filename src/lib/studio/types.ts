@@ -69,11 +69,24 @@ export interface ChatMessage {
 
 export type SetStatus = "draft" | "approved";
 
+/** An approved word that has no finished item yet (the AI failed or the item failed validation). Kept so it is never silently lost. */
+export interface MissingItem {
+  word: string;
+  /** Why it failed, in plain words. */
+  reason: string;
+  /** Where it belongs in the set (its place in the teacher's approved list). */
+  index: number;
+}
+
 export interface StudioSet {
   id: string;
   title: string;
   status: SetStatus;
   words: VocabWord[];
+  /** How many words the teacher approved for this set (so "9 approved · 7 written · 2 failed" can always be shown). Older sets lack it. */
+  requested?: number;
+  /** Approved words that still have no item. While any exist the set cannot be approved or hosted. */
+  missing?: MissingItem[];
   /** Word ids the teacher has locked: whole-set regeneration never replaces these. */
   lockedIds: string[];
 }
