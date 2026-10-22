@@ -20,6 +20,9 @@ export function SetPanel({
   onToggleLock,
   onReplace,
   onNewHints,
+  onIllustrate,
+  onIllustrateAll,
+  onRemoveIllustration,
   onRegenerateSet,
   onFill,
   onApprove,
@@ -38,6 +41,9 @@ export function SetPanel({
   onToggleLock: (setId: string, wordId: string) => void;
   onReplace: (setId: string, wordId: string, instruction: string) => void;
   onNewHints: (setId: string, wordId: string, instruction: string) => void;
+  onIllustrate: (setId: string, wordId: string) => void;
+  onIllustrateAll: (setId: string) => void;
+  onRemoveIllustration: (setId: string, wordId: string) => void;
   onRegenerateSet: (setId: string) => void;
   onFill: (setId: string) => void;
   onApprove: (setId: string) => void;
@@ -92,6 +98,23 @@ export function SetPanel({
           </p>
           {mixAdvice(set.words) ? <p className="note">{mixAdvice(set.words)}</p> : null}
 
+          <div className="picbar">
+            {(() => {
+              const have = set.words.filter((w) => w.illustration).length;
+              const missing = set.words.length - have;
+              return (
+                <>
+                  <span className="note">🖼 Giver pictures: {have} of {set.words.length}. Private to the Giver — not a hint, no points lost.</span>
+                  {missing > 0 ? (
+                    <button type="button" className="btn btn--small" disabled={disabled || !canGenerate} onClick={() => onIllustrateAll(set.id)}>
+                      Draw {missing} picture{missing === 1 ? "" : "s"} (AI)
+                    </button>
+                  ) : null}
+                </>
+              );
+            })()}
+          </div>
+
           <ol className="items">
             {set.words.map((w, i) => (
               <WordRow
@@ -107,6 +130,8 @@ export function SetPanel({
                 onToggleLock={() => onToggleLock(set.id, w.id)}
                 onReplace={(ins) => onReplace(set.id, w.id, ins)}
                 onNewHints={(ins) => onNewHints(set.id, w.id, ins)}
+                onIllustrate={() => onIllustrate(set.id, w.id)}
+                onRemoveIllustration={() => onRemoveIllustration(set.id, w.id)}
               />
             ))}
           </ol>

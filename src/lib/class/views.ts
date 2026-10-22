@@ -2,7 +2,7 @@ import type { GameState } from "@/lib/game";
 import { redactForTaker } from "@/lib/game";
 import type { SeatRole } from "./types";
 
-const BLANK = { word: "", accept: [] as string[], meaning: "", example: "", ja: [] as string[], giverInfo: undefined };
+const BLANK = { word: "", accept: [] as string[], meaning: "", example: "", ja: [] as string[], giverInfo: undefined, illustration: undefined };
 
 /**
  * The Giver may see ONLY the word currently in play (and words already solved/skipped).

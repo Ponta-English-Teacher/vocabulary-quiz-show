@@ -54,6 +54,14 @@ export function GiverRound({ state, dispatch }: { state: GameState; dispatch: (a
         </section>
       ) : null}
 
+      {word.illustration?.src ? (
+        <figure className="giver-pic">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={word.illustration.src} alt={word.illustration.alt ?? "Picture of the word (for you only)"} />
+          <figcaption className="note">Picture — only you can see this. Not a hint: no points lost.</figcaption>
+        </figure>
+      ) : null}
+
       <section className="meaning">
         <h3 className="label">Meaning</h3>
         <p className="meaning__text">{word.meaning}</p>

@@ -17,7 +17,22 @@ export const LIMITS = {
   giverLine: 200, phrase: 100, phrases: 4,
   /** Approved Japanese equivalents. */
   ja: 8, jaItem: 40,
+  /** Illustration: longest accepted data URL (a compressed picture is typically 30–150 KB), and alt text. */
+  illustrationSrc: 450_000, illustrationAlt: 200,
 } as const;
+
+const DATA_IMAGE = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+/** Only inline jpeg/png/webp pictures of a sane size are accepted (no SVG, no remote URLs). */
+export const isIllustrationSrc = (v: unknown): v is string => typeof v === "string" && v.length <= LIMITS.illustrationSrc && DATA_IMAGE.test(v);
+
+/** `{src, alt}` → a valid Illustration, or undefined. `allowMarker` keeps the empty-src "a picture exists" marker of hosted words. */
+export function coerceIllustration(raw: unknown, allowMarker = false): { src: string; alt?: string } | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  const alt = typeof r.alt === "string" && r.alt.trim() ? r.alt.trim().slice(0, LIMITS.illustrationAlt) : undefined;
+  if (r.src === "" && allowMarker) return { src: "", ...(alt ? { alt } : {}) };
+  return isIllustrationSrc(r.src) ? { src: r.src, ...(alt ? { alt } : {}) } : undefined;
+}
 
 export interface WordIssue {
   /** Machine-readable reason, where one matters (e.g. AI output with letter-only hints is rejected). */
@@ -237,6 +252,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
   // Optional fields — sets saved before they existed simply don't have them. The AI may send them flat or nested.
   const giverInfo = coerceGiverInfo(r.giverInfo ?? { looks: r.looks, use: r.use, phrases: r.phrases });
   const ja = coerceJa(r.ja ?? r.japanese);
+  const illustration = coerceIllustration(r.illustration);
 
   if (errors.length || !pos || !cefr) return { errors };
   return {
@@ -252,6 +268,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
       hints: hintsRaw.slice(0, 3),
       ...(giverInfo ? { giverInfo } : {}),
       ...(ja.length ? { ja } : {}),
+      ...(illustration ? { illustration } : {}),
     },
   };
 }

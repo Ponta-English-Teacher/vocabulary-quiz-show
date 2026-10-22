@@ -30,6 +30,9 @@ export type ActResult = { ok: true; applied: boolean; view: ClassView | null } |
 
 const roomKey = (activityId: string, group: string) => `vqs:room:${activityId}:${group}`;
 const actKey = (id: string) => `vqs:act:${id}`;
+const imgKey = (activityId: string, wordId: string) => `vqs:img:${activityId}:${wordId}`;
+/** All pictures of one hosted activity, in total (each one is also capped by LIMITS.illustrationSrc). */
+const MAX_PICTURE_CHARS = 4_000_000;
 const presKey = (activityId: string, group: string, seat: 0 | 1) => `vqs:pres:${activityId}:${group}:${seat}`;
 
 const serialize = (r: Room) => `${r.version}|${JSON.stringify(r)}`;
@@ -80,13 +83,17 @@ export class ClassService {
       ids.add(c.word.id);
       words.push(c.word);
     }
+    // Pictures live in their own keys, so the activity (read on every join) stays small and can never leak one.
+    const pictures = words.flatMap((w) => (w.illustration?.src ? [{ id: w.id, src: w.illustration.src }] : []));
+    if (pictures.reduce((n, p) => n + p.src.length, 0) > MAX_PICTURE_CHARS) return fail("bad_request", "The illustrations are too large to host together.");
     const activity: ClassActivity = {
       id: randomBytes(5).toString("hex"), // 10 hex chars
       title: input.title.trim().slice(0, 100) || "Class activity",
-      words,
+      words: words.map((w) => (w.illustration?.src ? { ...w, illustration: { src: "", ...(w.illustration.alt ? { alt: w.illustration.alt } : {}) } } : w)),
       createdAt: this.now(),
     };
     const r = await this.guard(async () => {
+      for (const p of pictures) await this.kv.set(imgKey(activity.id, p.id), p.src, ACTIVITY_TTL);
       await this.kv.set(actKey(activity.id), JSON.stringify(activity), ACTIVITY_TTL);
       return true as const;
     });
@@ -108,6 +115,22 @@ export class ClassService {
       const a = await this.loadActivity(id);
       return a ? { title: a.title, wordCount: a.words.length } : null;
     });
+  }
+
+  /**
+   * The Giver's private picture. Only the GIVER's view, and only while a word is in play, gets the real image for
+   * that one word (everything else keeps the empty marker or nothing). The Taker's view never reaches this code path
+   * with a picture: redactForTaker already removed it. A missing/expired image just means "no picture": the round
+   * is fully playable without it.
+   */
+  private async withPicture(room: Room, view: ClassView): Promise<ClassView> {
+    const g = view.game;
+    if (view.role !== "giver" || !g || g.phase !== "round" || !g.currentWordId) return view;
+    const w = g.words.find((x) => x.id === g.currentWordId);
+    if (!w?.illustration) return view;
+    const src = await this.kv.get(imgKey(room.activityId, w.id));
+    const illustration = src ? { ...w.illustration, src } : undefined;
+    return { ...view, game: { ...g, words: g.words.map((x) => (x.id === w.id ? { ...x, illustration } : x)) } };
   }
 
   // ---- presence ----------------------------------------------------------------------
@@ -142,7 +165,7 @@ export class ClassService {
           const seat = seatFor(cur.room, input.token);
           if (seat !== null) {
             const partner = await this.touch(cur.room, seat);
-            return { ok: true, token: input.token, seat, rejoined: true, view: buildView(cur.room, seat, partner) };
+            return { ok: true, token: input.token, seat, rejoined: true, view: await this.withPicture(cur.room, buildView(cur.room, seat, partner)) };
           }
         }
 
@@ -157,7 +180,7 @@ export class ClassService {
         if ("ok" in claimed) return claimed; // full
         if (await this.kv.cas(key, cur?.version ?? 0, serialize(room), ROOM_TTL)) {
           const partner = await this.touch(room, claimed.seat);
-          return { ok: true, token, seat: claimed.seat, rejoined: false, view: buildView(room, claimed.seat, partner) };
+          return { ok: true, token, seat: claimed.seat, rejoined: false, view: await this.withPicture(room, buildView(room, claimed.seat, partner)) };
         }
         await sleep(10 + Math.random() * 30); // lost a race with another request: re-read and try again
       }
@@ -185,7 +208,7 @@ export class ClassService {
       if (input.since !== undefined && input.since === cur.room.version && (input.partnerWas === undefined || input.partnerWas === partner)) {
         return { ok: true, unchanged: true, version: cur.room.version };
       }
-      return { ok: true, unchanged: false, view: buildView(cur.room, seat, partner) };
+      return { ok: true, unchanged: false, view: await this.withPicture(cur.room, buildView(cur.room, seat, partner)) };
     })) as ViewResult;
   }
 
@@ -215,12 +238,12 @@ export class ClassService {
         if ("error" in out) return out.error;
         if (!out.applied) {
           const partner = await this.touch(cur.room, seat);
-          return { ok: true, applied: false, view: buildView(cur.room, seat, partner) };
+          return { ok: true, applied: false, view: await this.withPicture(cur.room, buildView(cur.room, seat, partner)) };
         }
         if (await this.kv.cas(key, cur.version, serialize(room), ROOM_TTL)) {
           if (out.left) return { ok: true, applied: true, view: null };
           const partner = await this.touch(room, seat);
-          return { ok: true, applied: true, view: buildView(room, seat, partner) };
+          return { ok: true, applied: true, view: await this.withPicture(room, buildView(room, seat, partner)) };
         }
         await sleep(10 + Math.random() * 30); // another request changed the room first: re-apply to the fresh state
       }

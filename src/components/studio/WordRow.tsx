@@ -16,6 +16,8 @@ export interface WordRowProps {
   onToggleLock: () => void;
   onReplace: (instruction: string) => void;
   onNewHints: (instruction: string) => void;
+  onIllustrate: () => void;
+  onRemoveIllustration: () => void;
 }
 
 const fieldIssues = (issues: WordIssue[], field: WordIssue["field"], hint?: number) =>
@@ -71,6 +73,7 @@ export function WordRow(p: WordRowProps) {
           {!p.open ? <span className="item__def">{w.meaning}</span> : null}
         </span>
         <span className="item__flags">
+          {w.illustration ? <span title="Has a Giver picture" aria-label="Has a Giver picture">🖼</span> : null}
           {p.locked ? <span title="Locked: kept when the set is regenerated" aria-label="Locked">🔒</span> : null}
           {errors > 0 ? <span className="flag-err" aria-label={`${errors} problem${errors === 1 ? "" : "s"}`}>⚠ {errors}</span> : null}
           <span className="item__chev" aria-hidden="true">{p.open ? "▾" : "▸"}</span>
@@ -197,6 +200,25 @@ export function WordRow(p: WordRowProps) {
               disabled={p.disabled}
             />
           </label>
+
+          <fieldset className="hintset picset">
+            <legend>Picture for the Giver</legend>
+            {w.illustration?.src ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="picset__img" src={w.illustration.src} alt={w.illustration.alt ?? "Giver picture"} />
+            ) : (
+              <p className="note">No picture yet. The word is playable without one.</p>
+            )}
+            <p className="note">Only the Giver sees this, from the start of the round. It is not a hint and costs no points.</p>
+            <div className="row row--left">
+              <button type="button" className="btn btn--small btn--ghost" disabled={p.disabled} onClick={p.onIllustrate}>
+                {w.illustration ? "Draw a new picture (AI)" : "Draw picture (AI)"}
+              </button>
+              {w.illustration ? (
+                <button type="button" className="btn btn--small btn--ghost" disabled={p.disabled} onClick={p.onRemoveIllustration}>Remove picture</button>
+              ) : null}
+            </div>
+          </fieldset>
 
           <div className="editor__ai">
             <label className="fld">

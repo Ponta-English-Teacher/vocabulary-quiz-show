@@ -13,6 +13,18 @@ export type CefrLevel = (typeof CEFR_LEVELS)[number];
 export const PARTS_OF_SPEECH = ["noun", "verb", "adjective", "adverb", "phrase"] as const;
 export type PartOfSpeech = (typeof PARTS_OF_SPEECH)[number];
 
+/**
+ * A private picture for the Giver (never shown to the Taker during a round, never a hint, never costs points).
+ * `src` is an inline image data URL made in Teacher Studio. In a hosted class the picture is moved out of the
+ * activity into its own storage key and `src` is "" in the stored word (a marker meaning "a picture exists");
+ * the server puts the real `src` into the GIVER's view of the word in play only.
+ */
+export interface Illustration {
+  src: string;
+  /** Short description for screen readers. */
+  alt?: string;
+}
+
 export interface VocabWord {
   /** Stable unique id (used for game state, never shown). Keep it opaque — it must not reveal the word. */
   id: string;
@@ -34,6 +46,8 @@ export interface VocabWord {
    * starts and is free. Hints 2 and 3 are optional and cost points. None of them contain the word.
    */
   hints: string[];
+  /** Optional private picture for the Giver. Older sets lack it. */
+  illustration?: Illustration;
   /** Optional Giver-only support: simple English the Giver can use to answer questions. Older sets lack it. */
   giverInfo?: GiverInfo;
   /**

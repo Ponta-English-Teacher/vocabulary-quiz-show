@@ -305,6 +305,8 @@ export function redactForTaker(state: GameState): GameState {
       // Same length, empty text: the Taker's phone can tell whether Japanese credit exists, never what the answers are.
       ja: (w.ja ?? []).map(() => ""),
       giverInfo: undefined,
+      // The Giver's private picture: never on the Taker's screen while the word is unsolved.
+      illustration: undefined,
     };
   });
   return { ...state, words };

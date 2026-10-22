@@ -651,3 +651,8 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .hostclass__opt { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.5rem 0.7rem; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 0.6rem; cursor: pointer; }
 .hostclass__opt:has(input:checked) { border-color: #ffd34e; background: rgba(255, 211, 78, 0.12); }
 .hostclass__opt.is-disabled { opacity: 0.55; cursor: not-allowed; }
+
+.giver-pic { margin: 0.2rem 0; display: grid; gap: 0.3rem; justify-items: center; }
+.giver-pic img { width: min(100%, 22rem); aspect-ratio: 1 / 1; object-fit: contain; border-radius: 0.8rem; background: #fff; }
+.picbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0.4rem 0; }
+.picset__img { width: min(100%, 14rem); border-radius: 0.6rem; background: #fff; }

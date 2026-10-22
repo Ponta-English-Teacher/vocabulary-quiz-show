@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   if (denied) return denied;
   let body: unknown;
   try {
-    body = await readJson(request, 200_000);
+    body = await readJson(request, 4_300_000);
   } catch {
     return errorResponse("bad_request", "Invalid request.");
   }

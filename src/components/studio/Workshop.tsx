@@ -6,9 +6,10 @@ import { callStudio, StudioClientError } from "@/lib/studio/ai/client";
 import type { StudioData, StudioRequest } from "@/lib/studio/ai/types";
 import {
   addSet, allTargetForms, appendWords, approveSet, regenerateSet, removeSet, renameActivity,
-  replaceWord, setBrief, setHints, splitApproved, toggleLock, toVocabSet, updateWord,
+  replaceWord, setBrief, setHints, setIllustration, splitApproved, toggleLock, toVocabSet, updateWord,
 } from "@/lib/studio/ops";
 import { getBrowserStorage, saveActivity } from "@/lib/studio/storage";
+import { requestIllustration } from "@/lib/studio/illustrateClient";
 import { SET_SIZE, type Activity, type Brief, type StudioCommand } from "@/lib/studio/types";
 import { ChatPanel } from "./ChatPanel";
 import { SetPanel } from "./SetPanel";
@@ -132,6 +133,47 @@ export function Workshop({
     const { data } = await call("regenerate-hints", { brief: actRef.current.brief, word, instruction: instruction || undefined });
     commit(setHints(actRef.current, setId, wordId, data.hints));
     setNotice({ kind: "info", text: `New hints for “${word.word}”. Only its hints changed.` });
+  };
+
+  /** Draw one picture for one word. A failure is reported and changes nothing: the word stays playable without a picture. */
+  const drawOne = async (setId: string, wordId: string): Promise<string | null> => {
+    const word = findWord(setId, wordId);
+    if (!word) return "That word no longer exists.";
+    setBusyWordId(wordId);
+    const r = await requestIllustration(word);
+    if (!r.ok) return r.message;
+    commit(setIllustration(actRef.current, setId, wordId, r.illustration));
+    return null;
+  };
+
+  const doIllustrate = async (setId: string, wordId: string) => {
+    setBusy("Drawing a picture");
+    const err = await drawOne(setId, wordId);
+    const word = findWord(setId, wordId);
+    setNotice(err ? { kind: "error", text: `No picture for “${word?.word ?? "this word"}”: ${err} The word is still playable without one.` } : { kind: "info", text: `New picture for “${word?.word}”. Nothing else changed.` });
+  };
+
+  /** One picture per word that has none yet, one at a time (keeps the cost visible and the failures separate). */
+  const doIllustrateAll = async (setId: string) => {
+    const set = actRef.current.sets.find((s) => s.id === setId);
+    if (!set) return;
+    const todo = set.words.filter((w) => !w.illustration).map((w) => w.id);
+    const failed: string[] = [];
+    let first = "";
+    for (let i = 0; i < todo.length; i++) {
+      setBusy(`Drawing picture ${i + 1} of ${todo.length}`);
+      const err = await drawOne(setId, todo[i]);
+      if (err) {
+        failed.push(findWord(setId, todo[i])?.word ?? "?");
+        first ||= err;
+        if (/OpenAI key|passcode|unauthor/i.test(err)) break; // every remaining word would fail the same way
+      }
+    }
+    setNotice(
+      failed.length
+        ? { kind: "error", text: `${todo.length - failed.length} of ${todo.length} pictures drawn. No picture for: ${failed.join(", ")}. ${first} Those words are still playable without one; use “Draw picture” on a word to try again.` }
+        : { kind: "info", text: `${todo.length} picture${todo.length === 1 ? "" : "s"} drawn. Only the Giver will ever see them.` },
+    );
   };
 
   const doRegenSet = async (setId: string, instruction?: string) => {
@@ -278,6 +320,9 @@ export function Workshop({
           onToggleLock={(s, w) => commit(toggleLock(actRef.current, s, w))}
           onReplace={(s, w, ins) => run("Finding a replacement", () => doReplace(s, w, ins))}
           onNewHints={(s, w, ins) => run("Writing new hints", () => doHints(s, w, ins))}
+          onIllustrate={(s, w) => run("Drawing a picture", () => doIllustrate(s, w))}
+          onIllustrateAll={(s) => run("Drawing pictures", () => doIllustrateAll(s))}
+          onRemoveIllustration={(s, w) => commit(setIllustration(actRef.current, s, w, undefined))}
           onRegenerateSet={(s) => run("Regenerating the set", () => doRegenSet(s))}
           onFill={(s) => run("Finding more words", () => doFill(s))}
           onApprove={(s) => {

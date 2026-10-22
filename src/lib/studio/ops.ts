@@ -1,4 +1,4 @@
-import { SAMPLE_SET, type VocabSet, type VocabWord } from "@/data/vocab";
+import { SAMPLE_SET, type Illustration, type VocabSet, type VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
 import { newId } from "./ids";
 import { EMPTY_BRIEF, SET_SIZE, type Activity, type Brief, type StudioSet } from "./types";
@@ -66,7 +66,43 @@ export function updateWord(
   patch: Partial<Omit<VocabWord, "id">>,
   now?: string,
 ): Activity {
-  return mapSet(a, setId, (s) => edited(s, s.words.map((w) => (w.id === wordId ? { ...w, ...patch } : w))), now);
+  return mapSet(
+    a,
+    setId,
+    (s) =>
+      edited(
+        s,
+        s.words.map((w) => {
+          if (w.id !== wordId) return w;
+          const next = { ...w, ...patch };
+          // A picture drawn for another word would be wrong for this one.
+          if (patch.word !== undefined && patch.word.trim() !== w.word.trim() && !("illustration" in patch)) delete next.illustration;
+          return next;
+        }),
+      ),
+    now,
+  );
+}
+
+/**
+ * Attach (or remove, with undefined) a word's picture. A picture is not part of what the teacher reviews as text,
+ * so this does NOT send an approved set back to draft.
+ */
+export function setIllustration(a: Activity, setId: string, wordId: string, illustration: Illustration | undefined, now?: string): Activity {
+  return mapSet(
+    a,
+    setId,
+    (s) => ({
+      ...s,
+      words: s.words.map((w) => {
+        if (w.id !== wordId) return w;
+        const { illustration: _old, ...rest } = w;
+        void _old;
+        return illustration ? { ...rest, illustration } : rest;
+      }),
+    }),
+    now,
+  );
 }
 
 export function setHints(a: Activity, setId: string, wordId: string, hints: string[]): Activity {
