@@ -71,10 +71,9 @@ Open the app → **Teacher Studio** (welcome screen). Talk to the AI producer, g
 3. Add environment variables (Production): `TEACHER_PASSCODE` (required), `OPENAI_API_KEY` (optional, for live AI).
 4. Deploy. Open the production URL → **Teacher Studio / Host for a class** → enter the passcode → share the QR code.
 
-## Voice: listening and speaking
+## Voice: hearing words
 - **Hearing words and hints (Giver):** the browser's built-in speech synthesis (free, offline). `src/lib/speech.ts` ranks the device's voices (natural/enhanced and well-known clear English voices first, novelty voices never), reads "____" as "blank", and allows only ONE playback at a time — starting another stops the first, pressing the playing button again stops it. Hints can be played once revealed (unrevealed hints cost points, so they stay hidden).
-- **Speaking an answer (Taker):** a microphone button next to the answer box uses the browser's speech recognition (`src/lib/dictation.ts`). It starts only when pressed (that is when the permission prompt appears), listens to one short utterance, puts the words in the box for the student to edit, and NEVER submits. No audio is recorded or stored by the app; the browser's speech service (Google for Chrome, Apple for Safari) may process the audio.
-- **Needs HTTPS on phones.** Microphone features require a secure context. `http://localhost` counts as secure; `http://192.168.x.x` (the classroom LAN link) does NOT — there the button explains this and typing / the keyboard's own microphone key still work.
+- **Answers are typed.** The app has no in-app speech recognition and never asks for microphone access. Students type in the answer box; a phone keyboard's own dictation key still works because it is just typing.
 
 ## Giver illustration (a last-resort hint)
 

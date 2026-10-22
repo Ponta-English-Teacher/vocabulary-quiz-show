@@ -559,20 +559,15 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .hostclass__url { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; justify-content: center; font-size: 0.9rem; word-break: break-all; }
 .hostclass__url a { color: var(--cyan); }
 
-/* ---- speech: playback and microphone ----------------------------------- */
+/* ---- speech: playback ----------------------------------- */
 .ladder li { grid-template-columns: 1.8rem 1fr auto; }
 .ladder li > .btn { grid-column: 2 / -1; }
 .speak-btn { width: 2.75rem; height: 2.75rem; border-radius: 50%; border: 1px solid var(--line); background: rgb(255 255 255 / 0.06); font-size: 1.05rem; line-height: 1; display: inline-grid; place-items: center; }
 .speak-btn:hover:not(:disabled) { background: rgb(255 255 255 / 0.14); }
 .speak-btn.is-on, .btn--speak[aria-pressed="true"] { border-color: var(--cyan); box-shadow: 0 0 0 3px rgb(56 225 255 / 0.2); }
 .speak-btn:disabled { opacity: 0.35; }
-.mic-btn { flex: none; width: 2.9rem; height: 2.9rem; border-radius: 50%; border: 1px solid rgb(56 225 255 / 0.55); background: rgb(56 225 255 / 0.12); font-size: 1.2rem; line-height: 1; display: grid; place-items: center; transition: transform 0.15s, background 0.2s; }
-.mic-btn:active { transform: scale(0.94); }
-.mic-btn.is-on { background: var(--magenta); border-color: var(--magenta); animation: mic-pulse 1.2s ease-in-out infinite; }
-.dictation-note { min-height: 1.4rem; font: italic 1rem/1.35 var(--serif); color: var(--cyan); }
 .answer__box { gap: 0.45rem; }
 .answer__box .btn--inline { padding-left: 0.8rem; padding-right: 0.8rem; }
-@keyframes mic-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgb(255 61 139 / 0.55); } 50% { box-shadow: 0 0 0 10px rgb(255 61 139 / 0); } }
 
 .qr { display: grid; justify-items: center; gap: 0.4rem; margin: 0.2rem 0; }
 .qr img, .qr__wait { background: #fff; padding: 8px; border-radius: 12px; display: block; }

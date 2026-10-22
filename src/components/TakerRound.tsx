@@ -2,11 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { currentWord, type Feedback, type GameAction, type GameState } from "@/lib/game";
-import { RECOGNITION_LANG } from "@/lib/dictation";
 import { questionsFor } from "@/lib/askQuestions";
 import { FREE_HINTS, takerPointsFor } from "@/lib/scoring";
 import { PointsMeter } from "./PointsMeter";
-import { useDictation } from "./useDictation";
 import { SkipButton } from "./SkipButton";
 
 
@@ -37,10 +35,6 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
   const inputRef = useRef<HTMLInputElement>(null);
   const jaInputRef = useRef<HTMLInputElement>(null);
   const fb = state.feedback;
-  // Voice input fills the box with what was heard. The student can edit it; only the submit button sends it.
-  // The recognition language belongs to the box: English box → en-US, Japanese box → ja-JP.
-  const micEn = useDictation((heard) => setText(heard), RECOGNITION_LANG.en);
-  const micJa = useDictation((heard) => setJaText(heard), RECOGNITION_LANG.ja);
 
   // Wrong guess: clear that box. Close guess: keep it so they can fix the spelling.
   useEffect(() => {
@@ -62,12 +56,10 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
   const jaPoints = takerPointsFor(state.hintsUsed, "ja", state.illustrationUsed);
 
   const openJapanese = () => {
-    micEn.abort();
     setMode("ja");
     window.setTimeout(() => jaInputRef.current?.focus({ preventScroll: true }), 0);
   };
   const backToEnglish = () => {
-    micJa.abort();
     setMode("en");
   };
 
@@ -112,7 +104,6 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
             className="answer"
             onSubmit={(e) => {
               e.preventDefault();
-              micEn.abort();
               dispatch({ type: "GUESS", text });
             }}
           >
@@ -126,26 +117,13 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
                 lang="en"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="Type, or tap 🎤 on your keyboard"
+                placeholder="Type your answer here"
                 autoComplete="off"
                 autoCapitalize="off"
                 autoCorrect="off"
                 spellCheck={false}
                 enterKeyHint="send"
               />
-              <button
-                type="button"
-                className={`mic-btn ${micEn.listening ? "is-on" : ""}`}
-                onClick={() => {
-                  micEn.toggle();
-                  inputRef.current?.focus({ preventScroll: true });
-                }}
-                aria-pressed={micEn.listening}
-                aria-label={micEn.listening ? "Stop listening" : "Speak your answer in English"}
-                title={micEn.listening ? "Tap to stop" : "Tap, then say your answer"}
-              >
-                <span aria-hidden="true">{micEn.listening ? "⏹" : "🎤"}</span>
-              </button>
               <button type="submit" className="btn btn--hero btn--inline" disabled={!text.trim()}>
                 Lock it in
               </button>
@@ -153,10 +131,7 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
             <p className={`feedback ${fb?.lang === "en" ? `feedback--${fb.kind}` : ""}`} role="status" aria-live="polite">
               {feedbackText(fb, "en")}
             </p>
-            <p className="dictation-note" role="status" aria-live="polite">
-              {micEn.listening ? "Listening… say your answer, then check the words below and press Lock it in." : micEn.message}
-            </p>
-            <p className="note">Prefer to type? Typing always works — and your keyboard&apos;s own microphone key also dictates.</p>
+            <p className="note">Type your answer. (Your phone keyboard&apos;s own microphone key works too, if it has one.)</p>
           </form>
 
           <div className="notenglish">
@@ -172,7 +147,6 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
           lang="ja"
           onSubmit={(e) => {
             e.preventDefault();
-            micJa.abort();
             dispatch({ type: "GUESS_JA", text: jaText });
           }}
         >
@@ -198,27 +172,11 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
               spellCheck={false}
               enterKeyHint="send"
             />
-            <button
-              type="button"
-              className={`mic-btn ${micJa.listening ? "is-on" : ""}`}
-              onClick={() => {
-                micJa.toggle();
-                jaInputRef.current?.focus({ preventScroll: true });
-              }}
-              aria-pressed={micJa.listening}
-              aria-label={micJa.listening ? "Stop listening" : "Speak your answer in Japanese"}
-              title={micJa.listening ? "Tap to stop" : "Tap, then say your answer in Japanese"}
-            >
-              <span aria-hidden="true">{micJa.listening ? "⏹" : "🎤"}</span>
-            </button>
             <button type="submit" className="btn btn--hero btn--inline" disabled={!jaText.trim() || !hasJapanese}>
               答えを送る
             </button>
           </div>
           <p className="feedback feedback--wrong" role="status" aria-live="polite">{feedbackText(fb, "ja")}</p>
-          <p className="dictation-note" role="status" aria-live="polite">
-            {micJa.listening ? "聞いています… Check the words, fix them if needed, then press 答えを送る." : micJa.message}
-          </p>
           <button type="button" className="btn btn--link" onClick={backToEnglish}>← Back to the English answer</button>
         </form>
       )}
