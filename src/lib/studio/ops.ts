@@ -183,6 +183,20 @@ export function approvedSets(a: Activity): StudioSet[] {
   return a.sets.filter((s) => s.status === "approved");
 }
 
+/**
+ * "Today's Words" for classroom hosting: the first approved AND complete (playable) set of the most recently
+ * updated activity that has one. Drafts and incomplete sets never qualify; returns null when there is none,
+ * so the caller can say so instead of falling back to the preset.
+ */
+export function todaysWords(activities: Activity[]): VocabSet | null {
+  const newest = [...activities].sort((x, y) => y.updatedAt.localeCompare(x.updatedAt));
+  for (const a of newest) {
+    const set = approvedSets(a).find((s) => approvalProblems(s).length === 0);
+    if (set) return toVocabSet(a, set);
+  }
+  return null;
+}
+
 /** Add words to the end of a set (used to top up a set that came back short). Never changes existing words. */
 export function appendWords(a: Activity, setId: string, words: VocabWord[]): Activity {
   return mapSet(a, setId, (s) => {

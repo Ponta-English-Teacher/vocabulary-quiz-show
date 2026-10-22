@@ -55,7 +55,7 @@ export function Welcome({
             Each student plays on their own phone with a private screen: one is the Giver, the other is the Taker.
             Students scan the teacher&apos;s QR code, then enter a name and a group number.
           </p>
-          <HostClass set={sets.find((x) => x.id === selectedId) ?? sets[0]} />
+          <HostClass />
           <button type="button" className="btn btn--studio" onClick={onOpenStudio}>
             Teacher Studio
           </button>

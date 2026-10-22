@@ -1,22 +1,37 @@
 "use client";
 
-import { useState } from "react";
-import type { VocabSet } from "@/data/vocab";
+import { useEffect, useState } from "react";
+import { SAMPLE_SET, type VocabSet } from "@/data/vocab";
+import { todaysWords } from "@/lib/studio/ops";
+import { getBrowserStorage, loadActivities } from "@/lib/studio/storage";
 import { pickClassroomUrls } from "@/lib/class/url";
 import { clearPasscode, teacherHeaders } from "@/lib/teacher/client";
 import { QrCode } from "../QrCode";
 import { TeacherPasscodeForm } from "../TeacherPasscodeForm";
 import { useTeacherAccess } from "../useTeacherAccess";
 
-/** Teacher: publish the selected set as a class activity; get the link and a QR code students scan with their phones. */
-export function HostClass({ set }: { set: VocabSet }) {
+type Choice = "preset" | "today";
+
+/** Teacher: choose an activity, publish it for a class, and get the link and a QR code students scan with their phones. */
+export function HostClass() {
   const access = useTeacherAccess();
+  // Today's Words is read from this browser's saved Studio activities (it survives refreshes; re-read on mount and on tab focus).
+  const [today, setToday] = useState<VocabSet | null>(null);
+  const [choice, setChoice] = useState<Choice | null>(null); // the teacher must choose explicitly
+  useEffect(() => {
+    const read = () => setToday(todaysWords(loadActivities(getBrowserStorage()).activities));
+    read();
+    window.addEventListener("focus", read);
+    return () => window.removeEventListener("focus", read);
+  }, []);
+  const set = choice === "today" ? today : choice === "preset" ? SAMPLE_SET : null;
   const [links, setLinks] = useState<{ primary: string; others: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
   const create = async () => {
+    if (!set) return;
     setBusy(true);
     setError(null);
     try {
@@ -50,7 +65,21 @@ export function HostClass({ set }: { set: VocabSet }) {
 
   return (
     <div className="hostclass">
-      <button type="button" className="btn btn--ghost" onClick={create} disabled={busy || access.status === "loading"}>
+      <fieldset className="hostclass__choose">
+        <legend className="field__label">Choose an Activity</legend>
+        <label className="hostclass__opt">
+          <input type="radio" name="host-activity" checked={choice === "preset"} onChange={() => { setChoice("preset"); setLinks(null); }} />
+          <span><b>Preset Vocabulary</b> — {SAMPLE_SET.title} · {SAMPLE_SET.words.length} words</span>
+        </label>
+        <label className={`hostclass__opt ${today ? "" : "is-disabled"}`}>
+          <input type="radio" name="host-activity" disabled={!today} checked={choice === "today" && !!today} onChange={() => { setChoice("today"); setLinks(null); }} />
+          <span>
+            {today ? <><b>Today&apos;s Words</b> — {today.title} · {today.words.length} words</> : <><b>Today&apos;s Words</b> — Not available yet.</>}
+          </span>
+        </label>
+        {!today ? <p className="note">Approve a complete 10-word set in Teacher Studio to make it available here.</p> : null}
+      </fieldset>
+      <button type="button" className="btn btn--ghost" onClick={create} disabled={busy || !set || access.status === "loading"}>
         {busy ? "Creating…" : "Host for a class (two phones)"}
       </button>
       {error ? <p className="feedback feedback--wrong" role="alert">{error}</p> : null}
@@ -66,7 +95,7 @@ export function HostClass({ set }: { set: VocabSet }) {
           ))}
         </div>
       ) : (
-        <p className="note">Creates a link and QR code for the selected word set.</p>
+        <p className="note">{set ? `Creates a link and QR code for “${set.title}”.` : "Choose an activity above, then create the link."}</p>
       )}
     </div>
   );

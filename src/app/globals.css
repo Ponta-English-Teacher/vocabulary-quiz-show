@@ -646,3 +646,8 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 
 .fld--ja input, .fld--ja textarea { font-family: inherit; }
 .ai-note { font-size: 0.85rem; color: var(--ink-dim); }
+
+.hostclass__choose { border: 0; margin: 0; padding: 0; width: 100%; display: grid; gap: 0.4rem; text-align: left; }
+.hostclass__opt { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.5rem 0.7rem; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 0.6rem; cursor: pointer; }
+.hostclass__opt:has(input:checked) { border-color: #ffd34e; background: rgba(255, 211, 78, 0.12); }
+.hostclass__opt.is-disabled { opacity: 0.55; cursor: not-allowed; }
