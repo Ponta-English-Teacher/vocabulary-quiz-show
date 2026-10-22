@@ -16,6 +16,7 @@ import { RoleSwitch } from "./RoleSwitch";
 import { SoundToggle } from "./SoundToggle";
 import { Stage } from "./Stage";
 import { TakerRound } from "./TakerRound";
+import { selectWords } from "@/lib/playCount";
 import { Welcome } from "./Welcome";
 
 export function Game({
@@ -73,7 +74,7 @@ export function Game({
             selectedId={activeSet.id}
             onSelectSet={onSelectSet}
             onOpenStudio={onOpenStudio}
-            onStart={(names) => dispatch({ type: "START", names, words: activeSet.words })}
+            onStart={(names, count) => dispatch({ type: "START", names, words: selectWords(activeSet.words, count) })}
           />
         ) : null}
         {state.phase === "switch" ? <RoleSwitch key={state.history.length} state={state} onContinue={() => dispatch({ type: "CONTINUE" })} /> : null}

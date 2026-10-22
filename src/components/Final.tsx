@@ -35,7 +35,7 @@ export function Final({ state, onAgain }: { state: GameState; onAgain: () => voi
   if (!revealed) {
     return (
       <main className="screen final final--wait" aria-live="polite">
-        <p className="eyebrow">Ten words later…</p>
+        <p className="eyebrow">{state.words.length === 1 ? "One word later…" : `${state.words.length} words later…`}</p>
         <h2 className="drumroll">And the winner is<span className="dots"><i>.</i><i>.</i><i>.</i></span></h2>
       </main>
     );

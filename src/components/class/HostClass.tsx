@@ -6,6 +6,8 @@ import { todaysWords } from "@/lib/studio/ops";
 import { getBrowserStorage, loadActivities } from "@/lib/studio/storage";
 import { pickClassroomUrls } from "@/lib/class/url";
 import { clearPasscode, teacherHeaders } from "@/lib/teacher/client";
+import { clampPlayCount, DEFAULT_PLAY_COUNT, selectWords } from "@/lib/playCount";
+import { PlayCount } from "../PlayCount";
 import { QrCode } from "../QrCode";
 import { TeacherPasscodeForm } from "../TeacherPasscodeForm";
 import { useTeacherAccess } from "../useTeacherAccess";
@@ -25,6 +27,9 @@ export function HostClass() {
     return () => window.removeEventListener("focus", read);
   }, []);
   const set = choice === "today" ? today : choice === "preset" ? SAMPLE_SET : null;
+  const available = set?.words.length ?? 0;
+  const [count, setCount] = useState(DEFAULT_PLAY_COUNT);
+  const playCount = clampPlayCount(count, available || DEFAULT_PLAY_COUNT);
   const [links, setLinks] = useState<{ primary: string; others: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,7 +43,7 @@ export function HostClass() {
       const res = await fetch("/api/class", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...teacherHeaders() },
-        body: JSON.stringify({ set: { title: set.title, words: set.words } }),
+        body: JSON.stringify({ set: { title: set.title, words: selectWords(set.words, playCount) } }),
       });
       const j = await res.json();
       if (res.status === 401) clearPasscode();
@@ -68,17 +73,23 @@ export function HostClass() {
       <fieldset className="hostclass__choose">
         <legend className="field__label">Choose an Activity</legend>
         <label className="hostclass__opt">
-          <input type="radio" name="host-activity" checked={choice === "preset"} onChange={() => { setChoice("preset"); setLinks(null); }} />
+          <input type="radio" name="host-activity" checked={choice === "preset"} onChange={() => { setChoice("preset"); setCount(DEFAULT_PLAY_COUNT); setLinks(null); }} />
           <span><b>Preset Vocabulary</b> — {SAMPLE_SET.title} · {SAMPLE_SET.words.length} words</span>
         </label>
         <label className={`hostclass__opt ${today ? "" : "is-disabled"}`}>
-          <input type="radio" name="host-activity" disabled={!today} checked={choice === "today" && !!today} onChange={() => { setChoice("today"); setLinks(null); }} />
+          <input type="radio" name="host-activity" disabled={!today} checked={choice === "today" && !!today} onChange={() => { setChoice("today"); setCount(DEFAULT_PLAY_COUNT); setLinks(null); }} />
           <span>
             {today ? <><b>Today&apos;s Words</b> — {today.title} · {today.words.length} words</> : <><b>Today&apos;s Words</b> — Not available yet.</>}
           </span>
         </label>
         {!today ? <p className="note">Approve a complete 10-word set in Teacher Studio to make it available here.</p> : null}
       </fieldset>
+      {set ? (
+        <>
+          <p className="note"><b>{choice === "today" ? "Today's Words" : "Preset Vocabulary"}</b> — {available} available</p>
+          <PlayCount available={available} value={playCount} onChange={(n) => { setCount(n); setLinks(null); }} />
+        </>
+      ) : null}
       <button type="button" className="btn btn--ghost" onClick={create} disabled={busy || !set || access.status === "loading"}>
         {busy ? "Creating…" : "Host for a class (two phones)"}
       </button>
@@ -95,7 +106,7 @@ export function HostClass() {
           ))}
         </div>
       ) : (
-        <p className="note">{set ? `Creates a link and QR code for “${set.title}”.` : "Choose an activity above, then create the link."}</p>
+        <p className="note">{set ? `Creates a link and QR code for “${set.title}” — ${playCount} of ${available} words.` : "Choose an activity above, then create the link."}</p>
       )}
     </div>
   );
