@@ -20,11 +20,13 @@ describe("question ideas follow the kind of word", () => {
     expect(resolveAskKind(sample("umbrella"))).toBe("object");
     expect(qs).toContain("What does it look like?");
     expect(qs).toContain("What do you do with it?");
+    expect(qs).toContain("What do you use it for?");
   });
   it("actions ask what someone is doing", () => {
     for (const w of ["whisper", "borrow", "procrastinate"]) {
       expect(resolveAskKind(sample(w))).toBe("action");
       expect(questionsFor(sample(w))).toContain("What is someone doing?");
+      expect(questionsFor(sample(w))).toContain("What does someone do?");
       expect(questionsFor(sample(w))).toContain("When might someone do this?");
     }
   });
@@ -34,6 +36,7 @@ describe("question ideas follow the kind of word", () => {
       const qs = questionsFor(sample(w));
       expect(qs).toContain("How does the person feel?");
       expect(qs).toContain("Do they want to do something?");
+      expect(qs).toContain("Why might someone feel this way?");
       expect(qs).not.toContain(WHERE);
       expect(all(qs)).not.toMatch(/look like|made of|where do you use/i);
     }
@@ -47,6 +50,7 @@ describe("question ideas follow the kind of word", () => {
   it("abstract concepts ask for examples", () => {
     expect(resolveAskKind(sample("deadline"))).toBe("concept");
     expect(questionsFor(sample("deadline"))).toContain("Can you give me an example?");
+    expect(questionsFor(sample("deadline"))).toContain("What kind of situation involves this?");
     expect(questionsFor(sample("deadline"))).toContain("Is it related to people's behavior?");
   });
   it("expressions ask when someone would say it", () => {

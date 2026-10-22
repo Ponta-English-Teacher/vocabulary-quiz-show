@@ -48,6 +48,7 @@ export function resolveAskKind(word: { askKind?: unknown; partOfSpeech: PartOfSp
 const QUESTIONS: Record<AskKind, string[]> = {
   object: [
     "What does it look like?",
+    "What do you use it for?",
     "What do you do with it?",
     "Where can I find it?",
     "What is it made of?",
@@ -55,6 +56,7 @@ const QUESTIONS: Record<AskKind, string[]> = {
     "Do you use it every day?",
   ],
   action: [
+    "What does someone do?",
     "What is someone doing?",
     "When might someone do this?",
     "Where might someone do this?",
@@ -65,6 +67,7 @@ const QUESTIONS: Record<AskKind, string[]> = {
   feeling: [
     "How does the person feel?",
     "Do they want to do something?",
+    "Why might someone feel this way?",
     "Is it a good or a bad feeling?",
     "When might someone feel this?",
     "What might the person say or do?",
@@ -80,6 +83,7 @@ const QUESTIONS: Record<AskKind, string[]> = {
   ],
   concept: [
     "Can you give me an example?",
+    "What kind of situation involves this?",
     "Is it related to people's behavior?",
     "When do people talk about it?",
     "Is it something good, bad, or neither?",
