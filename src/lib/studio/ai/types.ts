@@ -22,6 +22,8 @@ export type StudioData =
       task: "generate"; words: VocabWord[]; issues: string[]; requested: number;
       /** Teacher-approved words that could NOT be written, each with the reason. Never silently dropped. */
       failed?: { word: string; reason: string }[];
+      /** Teacher-approved words whose item exists but whose HINTS still need correction (the word is kept, never dropped). */
+      flagged?: { word: string; reason: string; hints: number[] }[];
     }
   | { task: "replace-word"; word: VocabWord }
   | { task: "regenerate-hints"; hints: [string, string, string] };

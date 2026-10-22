@@ -204,13 +204,15 @@ describe("Fix 2 — hint quality and CEFR accuracy", () => {
       expect(isLetterOnlyHint(h), h).toBe(false);
     }
   });
-  it("AI items whose hints are letter-only are rejected (and the retry is told why)", async () => {
+  it("AI items whose hints are letter-only are KEPT and only their hints are rewritten (the repair is told why)", async () => {
     const lazy = (w: string) => item(w, { hints: ["It's used while preparing food.", "It has a sharp edge here.", `The first letter is '${w[0]}'.`] });
-    const { f, prompt } = fake({ words: ["knife", "whisk", "peeler"].map(lazy) }, { words: ["knife", "whisk", "peeler"].map((w) => item(w)) });
+    const goodHints = { hints: ["You reach for this on a busy weeknight.", "It has a distinctive shape and sits in a drawer.", "Unlike a spoon, a ____ does one particular job."] };
+    const { f, prompt } = fake({ words: ["knife", "whisk", "peeler"].map(lazy) }, goodHints, goodHints, goodHints);
     const d = await generate(f, { approved: ["knife", "whisk", "peeler"], count: 3 });
-    expect(d.words.map((w) => w.word)).toEqual(["knife", "whisk", "peeler"]);
+    expect(d.words.map((w) => w.word)).toEqual(["knife", "whisk", "peeler"]); // no word is dropped
     for (const w of d.words) expect(w.hints[2]).not.toMatch(/first letter/i);
-    expect(d.issues.join(" ")).toMatch(/only gives the first letter/);
+    expect(d.flagged).toBeUndefined(); // all repaired
+    expect(f).toHaveBeenCalledTimes(4); // one item request + one small hints request per flawed word (not a whole-set retry)
     expect(prompt(1)).toMatch(/only gives the first letter/);
   });
   it("teachers can still keep such a hint by hand — it is a warning, not a blocker", () => {

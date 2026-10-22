@@ -86,6 +86,13 @@ export function leaksTarget(target: Pick<VocabWord, "word" | "accept">, text: st
     const checks = parts.length === 1 ? parts : parts.filter((p) => p.length >= 5);
     for (const t of checks) {
       for (const tok of tokens) {
+        // One word OF a phrase (“store” in “department store”) only counts when the token really is that word or an ordinary form
+        // of it (store, stores, stored, storing) — not a different word that shares a few letters (story, storage).
+        if (parts.length > 1 && t.length <= 6) {
+          const stem = t.endsWith("e") ? t.slice(0, -1) : t;
+          if (tok === t || (tok.startsWith(t) && tok.length - t.length <= 2) || (tok.startsWith(stem) && /^(ing|ed|er|ers)$/.test(tok.slice(stem.length)))) return true;
+          continue;
+        }
         if (t.length <= 4) {
           if (tok === t || tok === `${t}s` || tok === `${t}es`) return true;
         } else if (tok.startsWith(t.slice(0, Math.max(4, t.length - 2)))) {
@@ -187,6 +194,11 @@ export function validateWord(w: VocabWord): WordIssue[] {
 }
 
 export const hasErrors = (issues: WordIssue[]) => issues.some((i) => i.severity === "error");
+
+/** Problems with a word's hints that make it not ready for play: a leak, an empty/long hint, a letter-only or generic opening hint. */
+export function hintProblems(w: VocabWord): WordIssue[] {
+  return validateWord(w).filter((p) => p.field === "hints" && (p.severity === "error" || p.code === "letter-only" || p.code === "vague-opening"));
+}
 
 export type CoerceResult = { word: VocabWord } | { errors: string[] };
 
@@ -299,20 +311,23 @@ export interface ParsedWords {
   issues: string[];
   /** The same rejections, tied to the word they were about (when the item named one). */
   rejected: { word: string; reason: string }[];
+  /** Items kept although their HINTS failed validation (only when keepHintFlaws is on): the word stays, the hints need repair. */
+  flawed: { word: string; reason: string; hints: number[] }[];
 }
 
 /** Validate a whole AI list: shape, content rules, duplicates (also against `exclude`). */
 export function parseGeneratedWords(
   raw: unknown,
-  ctx: { exclude?: string[]; max?: number; topic?: string; wordType?: string } = {},
+  ctx: { exclude?: string[]; max?: number; topic?: string; wordType?: string; keepHintFlaws?: boolean } = {},
 ): ParsedWords {
   const expected = ctx.topic ? expectedPartsOfSpeech(ctx.topic, ctx.wordType) : null;
   const issues: string[] = [];
-  if (!Array.isArray(raw)) return { words: [], issues: ["The AI did not return a list of words."], rejected: [] };
+  if (!Array.isArray(raw)) return { words: [], issues: ["The AI did not return a list of words."], rejected: [], flawed: [] };
 
   const taken = new Set((ctx.exclude ?? []).map(normalize));
   const words: VocabWord[] = [];
   const rejected: { word: string; reason: string }[] = [];
+  const flawed: { word: string; reason: string; hints: number[] }[] = [];
   raw.forEach((item, i) => {
     const label = `Item ${i + 1}`;
     const coerced = coerceWord(item);
@@ -326,9 +341,14 @@ export function parseGeneratedWords(
     // AI output must be clean: errors AND letter-only hints are rejected (teachers may still keep one by hand).
     const problems = validateWord(w).filter((p) => p.severity === "error" || p.code === "letter-only" || p.code === "vague-opening");
     if (problems.length) {
-      issues.push(`${label} (“${w.word}”): ${problems.map((p) => p.message).join(" ")}`);
-      rejected.push({ word: w.word, reason: problems.map((p) => p.message).join(" ") });
-      return;
+      // A teacher-approved word is never thrown away because of its hints: keep the item and report what needs repair.
+      if (ctx.keepHintFlaws && problems.every((p) => p.field === "hints")) {
+        flawed.push({ word: w.word, reason: problems.map((p) => p.message).join(" "), hints: [...new Set(problems.flatMap((p) => (p.hintIndex === undefined ? [] : [p.hintIndex])))] });
+      } else {
+        issues.push(`${label} (“${w.word}”): ${problems.map((p) => p.message).join(" ")}`);
+        rejected.push({ word: w.word, reason: problems.map((p) => p.message).join(" ") });
+        return;
+      }
     }
     // Topic accuracy: "kitchen tools" must not turn into cooking verbs (and vice versa).
     if (expected && !expected.allowed.includes(w.partOfSpeech)) {
@@ -345,5 +365,5 @@ export function parseGeneratedWords(
     forms.forEach((f) => taken.add(f));
     if (ctx.max === undefined || words.length < ctx.max) words.push(w);
   });
-  return { words, issues, rejected };
+  return { words, issues, rejected, flawed: flawed.filter((f) => words.some((x) => normalize(x.word) === normalize(f.word))) };
 }

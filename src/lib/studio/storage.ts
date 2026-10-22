@@ -73,6 +73,7 @@ export function parseActivity(raw: unknown): Activity | null {
       title: text(s.title, "Set"),
       status: s.status === "approved" ? "approved" : "draft",
       words,
+      ...(Array.isArray(s.flagged) && s.flagged.some((x) => typeof x === "string") ? { flagged: s.flagged.filter((x): x is string => typeof x === "string") } : {}),
       ...(typeof s.requested === "number" && Number.isFinite(s.requested) ? { requested: Math.max(0, Math.round(s.requested)) } : {}),
       ...(() => {
         const missing = Array.isArray(s.missing)

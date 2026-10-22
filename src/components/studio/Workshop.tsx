@@ -105,19 +105,24 @@ export function Workshop({
       }
       // Every approved word is accounted for: written, or recorded as missing WITH the reason. Nothing disappears silently.
       const missing = (data.failed ?? []).map((f) => ({ word: f.word, reason: f.reason, index: Math.max(0, approved.findIndex((x) => normalize(x) === normalize(f.word))) }));
-      const next = addSet(actRef.current, data.words, approved.length ? { requested: approved.length, missing } : {});
+      const flagged = data.flagged ?? [];
+      const next = addSet(actRef.current, data.words, approved.length ? { requested: approved.length, missing, flaggedWords: flagged.map((f) => f.word) } : {});
       commit(next);
       setActiveSetId(next.sets[next.sets.length - 1].id);
       made++;
-      if (missing.length) {
+      if (missing.length || flagged.length) {
+        const parts = [
+          ...flagged.map((f) => `“${f.word}” is in your set, but ${f.hints.length ? `hint${f.hints.length === 1 ? "" : "s"} ${f.hints.map((h) => h + 1).join(", ")}` : "its hints"} still need${f.hints.length === 1 ? "s" : ""} correcting — ${f.reason}`),
+          ...missing.map((m) => `“${m.word}” has no item yet — ${m.reason}`),
+        ];
         setNotice({
           kind: "error",
-          text: `Wrote ${data.words.length} of your ${approved.length} words for Set ${next.sets.length}. ${missing.length} need${missing.length === 1 ? "s" : ""} attention: ${missing.map((m) => `“${m.word}” — ${m.reason}`).join(" ")} Your other words are safe: use “Retry this word” on the lineup. The set can't be approved until each one is written or removed.`,
+          text: `All ${approved.length} of your words are kept. ${data.words.length - flagged.length} are complete; ${parts.length} need${parts.length === 1 ? "s" : ""} attention. ${parts.join(" ")} Edit the hints yourself, or use “Rewrite hints” / “Retry this word” on the lineup. The set can't be approved until each is fixed.`,
         });
       } else if (data.words.length < want) {
         setNotice({
           kind: "error",
-          text: `I could only produce ${data.words.length} valid words for Set ${next.sets.length} (${want} needed). ${data.issues.length} item${data.issues.length === 1 ? " was" : "s were"} rejected. ${data.issues.slice(0, 2).join(" ")} Use “Ask AI for ${SET_SIZE - data.words.length} more”, or add words by hand.`,
+          text: `I asked for ${want} words and ${data.words.length} came back valid for Set ${next.sets.length}. ${data.issues.length} item${data.issues.length === 1 ? " was" : "s were"} rejected along the way. ${data.issues.slice(0, 2).join(" ")} The set is fine as it is (a set can have 1–${SET_SIZE} words); ask the AI for more, or add words by hand.`,
         });
       }
     }

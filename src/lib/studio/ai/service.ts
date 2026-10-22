@@ -1,6 +1,6 @@
 import type { VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
-import { parseGeneratedWords } from "../validation";
+import { hintProblems, parseGeneratedWords } from "../validation";
 import { mockApproved, mockChat, mockGenerate, mockHints, mockReplace } from "./mock";
 import { callOpenAIJson, DEFAULT_MODEL, type FetchLike } from "./openai";
 import { mergeAiCandidates } from "../candidates";
@@ -13,6 +13,8 @@ import { AiError, type AiMode, type StudioData, type StudioRequest, type StudioR
 export const MAX_GENERATE_ATTEMPTS = 3;
 const EXTRA_ITEMS = 3;
 const MAX_ASK = 14;
+/** Tries to rewrite just the hints of ONE flawed approved word (each is a small request). */
+export const HINT_REPAIRS = 2;
 
 export interface ServiceDeps {
   /** From process.env on the server. Absent → mock mode. */
@@ -109,6 +111,8 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
       const required = uniqueWords(req.approved ?? []).slice(0, req.count);
       const found: VocabWord[] = [];
       let failed: { word: string; reason: string }[] = [];
+      let flagged: { word: string; reason: string; hints: number[] }[] = [];
+      const flawedNow = new Map<string, { reason: string; hints: number[] }>(); // approved word → what is wrong with its hints
       const reasons = new Map<string, string>(); // approved word → why it was rejected last time
 
       // 1) Teacher-approved words: write items for EXACTLY these words (unchanged), retrying only what is missing.
@@ -127,7 +131,8 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
             }
             throw e;
           }
-          const parsed = parseGeneratedWords((raw as { words?: unknown })?.words, { exclude: found.map((w) => w.word) });
+          const parsed = parseGeneratedWords((raw as { words?: unknown })?.words, { exclude: found.map((w) => w.word), keepHintFlaws: true });
+          for (const f of parsed.flawed) flawedNow.set(normalize(f.word), { reason: f.reason, hints: f.hints });
           issues.push(...parsed.issues);
           for (const r of parsed.rejected) if (missing.some((m) => normalize(m) === normalize(r.word))) reasons.set(normalize(r.word), r.reason);
           for (const w of parsed.words) {
@@ -137,6 +142,30 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
           }
           feedback = [...parsed.issues, ...(parsed.words.length === 0 ? ["Return one item for each approved word, spelled exactly as listed."] : [])].slice(0, 6);
         }
+        // 1b) A word whose HINTS failed validation keeps its item. Only its hints are rewritten (a small request for that one word,
+        //     at most HINT_REPAIRS tries each) — the rest of the item, and every other word, is left alone.
+        for (const w of found) {
+          const flaw = flawedNow.get(normalize(w.word));
+          if (!flaw) continue;
+          let tried = flaw.reason; // what the next rewrite is told to avoid
+          for (let t = 0; t < HINT_REPAIRS; t++) {
+            try {
+              const raw = await callOpenAIJson(cfg, hintsPrompt(req.brief, w, `Your previous hints were rejected: ${tried} Write three different hints that avoid these problems. The opening hint must be a real situation (who, when, where), and no hint may contain the word "${w.word}" or any part of it.`));
+              const hints = parseHints(raw, w);
+              const bad = hintProblems({ ...w, hints });
+              if (bad.length) { tried = bad.map((p) => p.message).join(" "); continue; }
+              w.hints = hints;
+              flawedNow.delete(normalize(w.word));
+              break;
+            } catch (e) {
+              if (!(e instanceof AiError) || (e.code !== "validation" && e.code !== "malformed")) break; // network/key trouble: stop, keep the word
+              tried = e.message;
+            }
+          }
+          // Still flawed: the word stays, described by what is actually wrong with the hints it has now.
+          if (flawedNow.has(normalize(w.word))) flawedNow.set(normalize(w.word), { reason: `${flaw.reason} Rewriting the hints automatically did not fix it.`, hints: flaw.hints });
+        }
+        flagged = [...flawedNow].map(([k, f]) => ({ word: found.find((w) => normalize(w.word) === k)!.word, ...f }));
         found.sort((a, b) => required.findIndex((r) => normalize(r) === normalize(a.word)) - required.findIndex((r) => normalize(r) === normalize(b.word)));
         const stillMissing = required.filter((w) => !found.some((f) => normalize(f.word) === normalize(w)));
         if (stillMissing.length) issues.push(`Could not write valid items for approved word${stillMissing.length === 1 ? "" : "s"}: ${stillMissing.join(", ")}.`);
@@ -151,7 +180,7 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
         issues.push(...free.issues);
       }
       if (found.length === 0) throw new AiError("malformed", "The AI did not return any usable vocabulary. Nothing was changed.");
-      return { task: "generate", words: found, issues, requested: req.count, ...(failed.length ? { failed } : {}) };
+      return { task: "generate", words: found, issues, requested: req.count, ...(failed.length ? { failed } : {}), ...(flagged.length ? { flagged } : {}) };
     }
 
     case "replace-word": {
@@ -169,7 +198,10 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const raw = await callOpenAIJson(cfg, hintsPrompt(req.brief, req.word, req.instruction));
-          return { task: "regenerate-hints", hints: parseHints(raw, req.word) };
+          const hints = parseHints(raw, req.word);
+          const bad = hintProblems({ ...req.word, hints });
+          if (bad.length) throw new AiError("validation", bad.map((p) => p.message).join(" "));
+          return { task: "regenerate-hints", hints };
         } catch (e) {
           if (!(e instanceof AiError) || (e.code !== "validation" && e.code !== "malformed")) throw e;
           last = e;

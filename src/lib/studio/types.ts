@@ -85,6 +85,8 @@ export interface StudioSet {
   words: VocabWord[];
   /** How many words the teacher approved for this set (so "9 approved · 7 written · 2 failed" can always be shown). Older sets lack it. */
   requested?: number;
+  /** Ids of approved words whose hints failed validation when generated. They stay in the set but block approval until their hints are fixed. */
+  flagged?: string[];
   /** Approved words that still have no item. While any exist the set cannot be approved or hosted. */
   missing?: MissingItem[];
   /** Word ids the teacher has locked: whole-set regeneration never replaces these. */

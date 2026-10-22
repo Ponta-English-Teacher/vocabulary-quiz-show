@@ -80,21 +80,24 @@ describe("the AI returns fewer items than requested (the reported bug)", () => {
   });
 });
 
-describe("items that fail validation are identified with the reason", () => {
-  it("one hint that gives the word away → that exact word, with that reason", async () => {
+describe("items whose hints fail validation are KEPT and flagged with the reason", () => {
+  it("one hint that gives the word away → the word stays in the set, flagged, with that reason", async () => {
     const ai = fakeAi((asked) => asked.map((w) => (w === "zester" ? leaky(w) : item(w))));
     const d = await generate(ai.f, NINE);
-    expect(d.words).toHaveLength(8);
-    expect(d.failed).toHaveLength(1);
-    expect(d.failed![0].word).toBe("zester");
-    expect(d.failed![0].reason).toMatch(/gives away|contains|target|word/i);
+    expect(d.words.map((w) => w.word)).toEqual(NINE); // nothing dropped
+    expect(d.failed).toBeUndefined();
+    expect(d.flagged).toHaveLength(1);
+    expect(d.flagged![0].word).toBe("zester");
+    expect(d.flagged![0].hints).toContain(1);
+    expect(d.flagged![0].reason).toMatch(/gives away/i);
   });
-  it("two items with a generic opening hint → both named; the other seven are untouched", async () => {
+  it("two items with a generic opening hint → both kept and flagged; the other seven are untouched", async () => {
     const ai = fakeAi((asked) => asked.map((w) => (w === "knife" || w === "ladle" ? vague(w) : item(w))));
     const d = await generate(ai.f, NINE);
-    expect(d.words.map((w) => w.word)).toEqual(NINE.filter((w) => w !== "knife" && w !== "ladle"));
-    expect(d.failed!.map((f) => f.word)).toEqual(["knife", "ladle"]);
-    expect(d.failed![0].reason).toMatch(/Hint 1|situation|label/i);
+    expect(d.words.map((w) => w.word)).toEqual(NINE);
+    expect(d.flagged!.map((f) => f.word)).toEqual(["knife", "ladle"]);
+    expect(d.flagged![0].reason).toMatch(/Hint 1|situation|label/i);
+    expect(d.flagged![0].hints).toEqual([0]);
   });
 });
 
@@ -130,7 +133,7 @@ describe("retrying one failed word keeps everything else", () => {
     expect(s.words.map((w) => w.word)).toEqual(["knife", "grater", "whisk", "zester", "colander", "ladle", "peeler", "spatula"]);
     set.words.forEach((w) => expect(s.words.find((x) => x.id === w.id)).toBe(w)); // the very same objects: not regenerated
     expect(s.missing?.map((m) => m.word)).toEqual(["tongs"]);
-    expect(setProgress(s)).toEqual({ approved: 9, written: 8, failed: 1 });
+    expect(setProgress(s)).toMatchObject({ approved: 9, written: 8, failed: 1 });
   });
   it("a failed retry keeps the word waiting with the new reason and changes nothing else", async () => {
     const { a, set } = await setup(["tongs"]);
@@ -143,7 +146,7 @@ describe("retrying one failed word keeps everything else", () => {
     const b = dropMissing(a, set.id, "tongs");
     expect(b.sets[0].missing).toBeUndefined();
     expect(b.sets[0].words).toHaveLength(8);
-    expect(setProgress(b.sets[0])).toEqual({ approved: 8, written: 8, failed: 0 });
+    expect(setProgress(b.sets[0])).toMatchObject({ approved: 8, written: 8, failed: 0 });
   });
 });
 
@@ -182,7 +185,7 @@ describe("saving and reloading", () => {
     expect(back.requested).toBe(9);
     expect(back.missing).toEqual(a.sets[0].missing);
     expect(back.words).toEqual(a.sets[0].words);
-    expect(setProgress(back)).toEqual({ approved: 9, written: 8, failed: 1 });
+    expect(setProgress(back)).toMatchObject({ approved: 9, written: 8, failed: 1 });
   });
 });
 
@@ -205,7 +208,7 @@ describe("existing sets of any size keep working", () => {
     const a = parseActivity(legacy)!;
     expect(a.sets[0].missing).toBeUndefined();
     expect(a.sets[0].requested).toBeUndefined();
-    expect(setProgress(a.sets[0])).toEqual({ approved: n, written: n, failed: 0 });
+    expect(setProgress(a.sets[0])).toMatchObject({ approved: n, written: n, failed: 0 });
     const r = approveSet(a, a.sets[0].id);
     expect(r.problems).toEqual([]);
     expect(todaysWords([r.activity])!.words).toHaveLength(n);

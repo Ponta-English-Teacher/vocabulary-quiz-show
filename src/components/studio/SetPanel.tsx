@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { VocabWord } from "@/data/vocab";
-import { approvalProblems, levelMix, mixAdvice, setProgress } from "@/lib/studio/ops";
+import { approvalProblems, levelMix, mixAdvice, setProgress, wordsNeedingHints } from "@/lib/studio/ops";
 import { SET_SIZE, type StudioSet } from "@/lib/studio/types";
 import { ConfirmButton } from "./shared";
 import { WordRow } from "./WordRow";
@@ -96,12 +96,20 @@ export function SetPanel({
 
           {(() => {
             const p = setProgress(set);
-            if (set.requested === undefined && !p.failed) return null;
+            const hintWords = wordsNeedingHints(set);
+            if (set.requested === undefined && !p.needCorrection) return null;
             return (
-              <div className={`progress ${p.failed ? "progress--bad" : ""}`} role="status" aria-label="Generation progress">
+              <div className={`progress ${p.needCorrection ? "progress--bad" : ""}`} role="status" aria-label="Generation progress">
                 <p>
-                  <b>{p.approved}</b> approved · <b>{p.written}</b> written · <b className={p.failed ? "c-gold" : ""}>{p.failed}</b> failed
+                  <b>{p.approved}</b> selected · <b>{p.valid}</b> valid &amp; complete · <b className={p.needCorrection ? "c-gold" : ""}>{p.needCorrection}</b> need correction
                 </p>
+                {hintWords.map(({ word, hints, reasons }) => (
+                  <p key={word.id} className="progress__miss">
+                    <b>“{word.word}”</b> — {hints.length ? `hint${hints.length === 1 ? "" : "s"} ${hints.map((h) => h + 1).join(", ")} need${hints.length === 1 ? "s" : ""} attention` : "its hints need attention"}: {reasons.join(" ")}{" "}
+                    <button type="button" className="btn btn--small" disabled={disabled || !canGenerate} onClick={() => onNewHints(set.id, word.id, "")}>Rewrite hints</button>{" "}
+                    <button type="button" className="btn btn--small btn--ghost" disabled={disabled} onClick={() => setOpenId(word.id)}>Edit hints myself</button>
+                  </p>
+                ))}
                 {(set.missing ?? []).map((m) => (
                   <p key={m.word} className="progress__miss">
                     <b>“{m.word}”</b> has no item yet — {m.reason}{" "}

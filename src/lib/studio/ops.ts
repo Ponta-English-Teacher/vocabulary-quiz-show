@@ -2,7 +2,7 @@ import { SAMPLE_SET, type Illustration, type VocabSet, type VocabWord } from "@/
 import { normalize } from "@/lib/answer";
 import { newId } from "./ids";
 import { EMPTY_BRIEF, MIN_SET_WORDS, SET_SIZE, type Activity, type Brief, type MissingItem, type StudioSet } from "./types";
-import { hasErrors, validateWord } from "./validation";
+import { hasErrors, hintProblems, validateWord } from "./validation";
 
 /**
  * Pure editing operations on an Activity. Every function returns a NEW activity and
@@ -173,18 +173,37 @@ export function regenerateSet(
   return { activity, replaced };
 }
 
-export function addSet(a: Activity, words: VocabWord[], opts: { requested?: number; missing?: MissingItem[] } = {}): Activity {
+export function addSet(a: Activity, words: VocabWord[], opts: { requested?: number; missing?: MissingItem[]; flaggedWords?: string[] } = {}): Activity {
   const title = `Set ${a.sets.length + 1}`;
   const set = createSet(words, title);
   if (opts.requested !== undefined) set.requested = opts.requested;
   if (opts.missing?.length) set.missing = opts.missing;
+  const flagged = (opts.flaggedWords ?? []).flatMap((w) => set.words.filter((x) => normalize(x.word) === normalize(w)).map((x) => x.id));
+  if (flagged.length) set.flagged = flagged;
   return touch({ ...a, sets: [...a.sets, set] });
 }
 
-/** Counts for "9 approved · 7 written · 2 failed". Sets made before this feature have no record of failures. */
-export function setProgress(set: StudioSet): { approved: number; written: number; failed: number } {
+/** Flagged words whose hints are STILL not right. Fixing the hints by hand or by AI clears the flag by itself. */
+export function wordsNeedingHints(set: StudioSet): { word: VocabWord; reasons: string[]; hints: number[] }[] {
+  return (set.flagged ?? []).flatMap((id) => {
+    const w = set.words.find((x) => x.id === id);
+    const problems = w ? hintProblems(w) : [];
+    return w && problems.length ? [{ word: w, reasons: problems.map((p) => p.message), hints: [...new Set(problems.flatMap((p) => (p.hintIndex === undefined ? [] : [p.hintIndex])))] }] : [];
+  });
+}
+
+/** Counts for the lineup: words the teacher selected, items that are complete and valid, and words that still need correction. */
+export function setProgress(set: StudioSet): { approved: number; written: number; failed: number; needHints: number; valid: number; needCorrection: number } {
   const failed = set.missing?.length ?? 0;
-  return { approved: set.requested ?? set.words.length + failed, written: set.words.length, failed };
+  const needHints = wordsNeedingHints(set).length;
+  return {
+    approved: set.requested ?? set.words.length + failed,
+    written: set.words.length,
+    failed,
+    needHints,
+    valid: set.words.length - needHints,
+    needCorrection: failed + needHints,
+  };
 }
 
 /** A retry produced the missing word's item: put it back where it belongs. Every other word is untouched. */
@@ -231,6 +250,9 @@ export function approvalProblems(set: StudioSet): string[] {
   if (set.words.length < MIN_SET_WORDS || set.words.length > SET_SIZE) problems.push(`A set needs ${MIN_SET_WORDS} to ${SET_SIZE} words (this one has ${set.words.length}).`);
   if (set.missing?.length) {
     problems.push(`${set.missing.length} approved word${set.missing.length === 1 ? " has" : "s have"} no item yet: ${set.missing.map((m) => `“${m.word}”`).join(", ")}. Retry ${set.missing.length === 1 ? "it" : "them"} or remove ${set.missing.length === 1 ? "it" : "them"} from the set first.`);
+  }
+  for (const f of wordsNeedingHints(set)) {
+    problems.push(`“${f.word.word}” still needs its hints corrected (${f.hints.length ? `hint${f.hints.length === 1 ? "" : "s"} ${f.hints.map((h) => h + 1).join(", ")}: ` : ""}${f.reasons.join(" ")}).`);
   }
   const seen = new Set<string>();
   set.words.forEach((w, i) => {
