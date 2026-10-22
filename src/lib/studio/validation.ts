@@ -1,5 +1,6 @@
 import { CEFR_LEVELS, PARTS_OF_SPEECH, type CefrLevel, type GiverInfo, type PartOfSpeech, type VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
+import { coerceAskKind } from "@/lib/askQuestions";
 import { normalizeJa } from "@/lib/japanese";
 import { newId } from "./ids";
 
@@ -253,6 +254,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
   const giverInfo = coerceGiverInfo(r.giverInfo ?? { looks: r.looks, use: r.use, phrases: r.phrases });
   const ja = coerceJa(r.ja ?? r.japanese);
   const illustration = coerceIllustration(r.illustration);
+  const askKind = coerceAskKind(r.askKind);
 
   if (errors.length || !pos || !cefr) return { errors };
   return {
@@ -268,6 +270,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
       hints: hintsRaw.slice(0, 3),
       ...(giverInfo ? { giverInfo } : {}),
       ...(ja.length ? { ja } : {}),
+      ...(askKind ? { askKind } : {}),
       ...(illustration ? { illustration } : {}),
     },
   };

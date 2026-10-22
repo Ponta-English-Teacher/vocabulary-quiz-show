@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ASK_KINDS, ASK_KIND_LABELS, coerceAskKind, resolveAskKind } from "@/lib/askQuestions";
 import { CEFR_LEVELS, PARTS_OF_SPEECH, type VocabWord } from "@/data/vocab";
 import { coerceJa, LIMITS, validateWord, type WordIssue } from "@/lib/studio/validation";
 
@@ -139,6 +140,23 @@ export function WordRow(p: WordRowProps) {
                 <Problems issues={fieldIssues(issues, "hints", i)} />
               </label>
             ))}
+          </fieldset>
+
+          <fieldset className="hintset">
+            <legend>Question ideas for the Taker</legend>
+            <label className="fld">
+              <span>Kind of word <small>(decides the sample questions the Taker sees; “Automatic” works it out from the part of speech and topic)</small></span>
+              <select
+                value={w.askKind ?? ""}
+                onChange={(e) => p.onEdit({ askKind: coerceAskKind(e.target.value) })}
+                disabled={p.disabled}
+              >
+                <option value="">Automatic ({ASK_KIND_LABELS[resolveAskKind(w)]})</option>
+                {ASK_KINDS.map((k) => (
+                  <option key={k} value={k}>{ASK_KIND_LABELS[k]}</option>
+                ))}
+              </select>
+            </label>
           </fieldset>
 
           <fieldset className="hintset">

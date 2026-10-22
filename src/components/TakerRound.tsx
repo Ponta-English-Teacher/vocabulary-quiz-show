@@ -3,21 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { currentWord, type Feedback, type GameAction, type GameState } from "@/lib/game";
 import { RECOGNITION_LANG } from "@/lib/dictation";
+import { questionsFor } from "@/lib/askQuestions";
 import { FREE_HINTS, takerPointsFor } from "@/lib/scoring";
 import { PointsMeter } from "./PointsMeter";
 import { useDictation } from "./useDictation";
 import { SkipButton } from "./SkipButton";
 
-const QUESTION_STARTERS = [
-  "Where do you use it?",
-  "What does it look like?",
-  "Can you give me an example sentence?",
-  "Is it a thing, an action, or a feeling?",
-  "Is it something you use every day?",
-  "What is it made of?",
-  "Does it have a similar word, or an opposite?",
-  "Can you act it out?",
-];
 
 /** The message under an answer box. Each box shows only feedback about its own language. */
 function feedbackText(fb: Feedback | null, lang: Feedback["lang"]): string | null {
@@ -42,6 +33,7 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
   // Which answer box is open. English is the default; the Japanese box opens only from the "not in English" button.
   const [mode, setMode] = useState<"en" | "ja">("en");
   const [tip, setTip] = useState(0);
+  const questions = questionsFor(word ?? { partOfSpeech: "noun" });
   const inputRef = useRef<HTMLInputElement>(null);
   const jaInputRef = useRef<HTMLInputElement>(null);
   const fb = state.feedback;
@@ -108,8 +100,8 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
       <section className="ask">
         <h3 className="label">Ask your partner — out loud!</h3>
         <p className="note ask__task">Ask your partner questions to find out the word.</p>
-        <button type="button" className="ask__prompt" onClick={() => setTip((t) => (t + 1) % QUESTION_STARTERS.length)}>
-          “{QUESTION_STARTERS[tip]}”
+        <button type="button" className="ask__prompt" onClick={() => setTip((t) => (t + 1) % questions.length)}>
+          “{questions[tip % questions.length]}”
           <span className="ask__more">tap for another idea</span>
         </button>
       </section>

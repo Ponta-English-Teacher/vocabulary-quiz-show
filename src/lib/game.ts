@@ -1,5 +1,6 @@
 import type { Illustration, VocabWord } from "@/data/vocab";
 import { checkAnswer } from "./answer";
+import { resolveAskKind } from "./askQuestions";
 import { checkJapaneseAnswer } from "./japanese";
 import { FREE_HINTS, giverPointsFor, takerPointsFor, type AnswerLanguage } from "./scoring";
 
@@ -329,6 +330,8 @@ export function redactForTaker(state: GameState): GameState {
       // Same length, empty text: the Taker's phone can tell whether Japanese credit exists, never what the answers are.
       ja: (w.ja ?? []).map(() => ""),
       giverInfo: undefined,
+      // Question ideas are chosen by the kind of word: a coarse label that says nothing about which word it is.
+      askKind: resolveAskKind(w),
       // The Giver's private picture: never on the Taker's screen while the word is unsolved.
       illustration: undefined,
     };

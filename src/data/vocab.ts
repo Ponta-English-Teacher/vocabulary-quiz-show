@@ -46,6 +46,12 @@ export interface VocabWord {
    * starts and is free. Hints 2 and 3 are optional and cost points. None of them contain the word.
    */
   hints: string[];
+  /**
+   * Optional kind of word (thing / action / feeling / description / idea / expression / manner). It picks the question ideas
+   * the Taker sees. Teacher-editable; when missing (older sets) it is worked out from the part of speech and topic.
+   * It is a coarse label, so it is safe to show the Taker.
+   */
+  askKind?: "object" | "action" | "feeling" | "quality" | "concept" | "expression" | "manner";
   /** Optional private picture for the Giver. Older sets lack it. */
   illustration?: Illustration;
   /** Optional Giver-only support: simple English the Giver can use to answer questions. Older sets lack it. */
