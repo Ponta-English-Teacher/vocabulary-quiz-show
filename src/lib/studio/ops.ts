@@ -56,6 +56,11 @@ export function setBrief(a: Activity, brief: Brief): Activity {
   return touch({ ...a, brief });
 }
 
+/** Name a set (its list name in the Vocabulary Library). Renaming never changes the set's words or its approval. */
+export function renameSet(a: Activity, setId: string, title: string): Activity {
+  return touch({ ...a, sets: a.sets.map((s) => (s.id === setId ? { ...s, title: title.slice(0, 60) } : s)) });
+}
+
 export function renameActivity(a: Activity, title: string): Activity {
   return touch({ ...a, title: title.trim().slice(0, 80) || "Untitled activity" });
 }

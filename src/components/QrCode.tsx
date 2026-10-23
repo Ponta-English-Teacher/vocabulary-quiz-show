@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 /** A QR code for `url`, generated in the browser (no outside service). Dark on white so phone cameras read it easily. */
-export function QrCode({ url, size = 220 }: { url: string; size?: number }) {
+export function QrCode({ url, size = 220, caption = "Scan to join" }: { url: string; size?: number; caption?: string }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -19,11 +19,11 @@ export function QrCode({ url, size = 220 }: { url: string; size?: number }) {
     <figure className="qr">
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} width={size} height={size} alt={`QR code that opens the classroom link ${url}`} />
+        <img src={src} width={size} height={size} alt={`QR code that opens ${url}`} />
       ) : (
         <div className="qr__wait" style={{ width: size, height: size }} aria-hidden="true" />
       )}
-      <figcaption>Scan to join</figcaption>
+      <figcaption>{caption}</figcaption>
     </figure>
   );
 }

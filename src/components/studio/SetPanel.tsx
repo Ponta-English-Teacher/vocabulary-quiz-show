@@ -16,6 +16,7 @@ export function SetPanel({
   busyWordId,
   canGenerate,
   onSelect,
+  onRenameSet,
   onAddSet,
   onRemoveSet,
   onEdit,
@@ -42,6 +43,8 @@ export function SetPanel({
   busyWordId: string | null;
   canGenerate: boolean;
   onSelect: (id: string) => void;
+  /** Name the list: it appears under this name in the Vocabulary Library. */
+  onRenameSet?: (setId: string, title: string) => void;
   onAddSet: () => void;
   onRemoveSet: (id: string) => void;
   onEdit: (setId: string, wordId: string, patch: Partial<Omit<VocabWord, "id">>) => void;
@@ -97,6 +100,13 @@ export function SetPanel({
               + Add set
             </button>
           </div>
+
+          {onRenameSet ? (
+            <label className="titlefld">
+              <span className="note">List name (how it appears in your Vocabulary Library)</span>
+              <input aria-label="List name" value={set.title} maxLength={60} onChange={(e) => onRenameSet(set.id, e.target.value)} />
+            </label>
+          ) : null}
 
           {(() => {
             const p = setProgress(set, restrictions);

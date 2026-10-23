@@ -6,11 +6,14 @@ import { fetchAiStatus } from "@/lib/studio/ai/client";
 import { activityFromSample, approvedSets, createActivity, toVocabSet } from "@/lib/studio/ops";
 import { deleteActivity, duplicateActivity, getBrowserStorage, loadActivities, saveActivity } from "@/lib/studio/storage";
 import type { Activity } from "@/lib/studio/types";
+import { unpublishStudy } from "@/lib/study/client";
+import { loadShares, removeShare } from "@/lib/study/shares";
+import { deleteLibraryList, libraryLists } from "@/lib/studio/library";
 import { AiBadge, type AiStatus } from "./shared";
 import { StudioHome } from "./StudioHome";
 import { Workshop } from "./Workshop";
 
-type View = { kind: "home" } | { kind: "workshop"; activity: Activity; key: number };
+type View = { kind: "home" } | { kind: "workshop"; activity: Activity; key: number; setId?: string };
 
 export function Studio({ onExit, onPlay }: { onExit: () => void; onPlay: (set: VocabSet) => void }) {
   const [view, setView] = useState<View>({ kind: "home" });
@@ -33,7 +36,7 @@ export function Studio({ onExit, onPlay }: { onExit: () => void; onPlay: (set: V
     fetchAiStatus().then((s) => setAi((prev) => ({ ...prev, mode: s.mode, model: s.model })));
   }, [refresh]);
 
-  const open = (activity: Activity) => setView({ kind: "workshop", activity, key: Date.now() });
+  const open = (activity: Activity, setId?: string) => setView({ kind: "workshop", activity, key: Date.now(), setId });
 
   const playActivity = (a: Activity) => {
     const first = approvedSets(a)[0];
@@ -56,6 +59,15 @@ export function Studio({ onExit, onPlay }: { onExit: () => void; onPlay: (set: V
       {view.kind === "home" ? (
         <StudioHome
           activities={activities}
+          library={libraryLists(activities)}
+          onEditList={(l) => { const a = activities.find((x) => x.id === l.activityId); if (a) open(a, l.setId); }}
+          onDeleteList={(l) => {
+            const r = deleteLibraryList(getBrowserStorage(), l.key);
+            // A deleted list's own study page is taken down with it (other lists' and classes' pages are untouched).
+            if (r.ok) for (const sh of loadShares(getBrowserStorage()).filter((x) => x.source === l.key)) void unpublishStudy(sh.token).then((u) => { if (u.ok) removeShare(getBrowserStorage(), sh.token); });
+            setMessage(r.ok ? { kind: "info", text: `Deleted the list “${r.title}”. Your other lists weren't touched.` } : { kind: "error", text: r.error });
+            refresh();
+          }}
           skipped={skipped}
           storageOk={storageOk}
           message={message}
@@ -85,6 +97,7 @@ export function Studio({ onExit, onPlay }: { onExit: () => void; onPlay: (set: V
         <Workshop
           key={view.key}
           initial={view.activity}
+          initialSetId={view.setId}
           ai={ai}
           onBack={() => { refresh(); setView({ kind: "home" }); }}
           onSaved={refresh}

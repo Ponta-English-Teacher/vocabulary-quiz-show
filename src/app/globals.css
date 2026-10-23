@@ -667,3 +667,19 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .progress { margin: 0.5rem 0; padding: 0.5rem 0.7rem; border: 1px solid var(--line); border-radius: 0.6rem; }
 .progress--bad { border-color: var(--gold, #f5c451); }
 .progress p { margin: 0.2rem 0; }
+
+/* ---- student study page ------------------------------------------------- */
+.study { width: 100%; max-width: 40rem; margin: 0 auto; padding: max(1rem, env(safe-area-inset-top)) 1rem 3rem; }
+.study__head { margin-bottom: 1.2rem; }
+.study__title { font: 700 italic 2rem/1.15 var(--serif); color: var(--gold); margin: 0.2rem 0 0.4rem; overflow-wrap: anywhere; }
+.study__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9rem; }
+.study__card { border: 1px solid var(--line); border-radius: 0.9rem; padding: 1rem 1.1rem; background: rgb(255 255 255 / 0.04); display: grid; gap: 0.4rem; }
+.study__word { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.study__word h2 { margin: 0; font: 700 1.6rem/1.15 var(--display); color: var(--ink); overflow-wrap: anywhere; }
+.study__pos { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+.study__def { margin: 0; font-size: 1.05rem; line-height: 1.45; }
+.study__ja { margin: 0; font-size: 1.05rem; color: var(--cyan); }
+.study__label { font-size: 0.72rem; color: var(--ink-faint); margin-right: 0.3rem; }
+.study__ex { margin: 0; font: italic 1rem/1.45 var(--serif); color: var(--ink-dim); }
+.studyshare { display: grid; gap: 0.4rem; justify-items: start; margin-top: 0.4rem; }
+.libhead { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }

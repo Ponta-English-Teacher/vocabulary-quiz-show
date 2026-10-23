@@ -5,7 +5,7 @@ import type { VocabSet, VocabWord } from "@/data/vocab";
 import { callStudio, StudioClientError } from "@/lib/studio/ai/client";
 import type { StudioData, StudioRequest } from "@/lib/studio/ai/types";
 import {
-  addSet, allTargetForms, appendWords, applyAiHints, protectedHints, approveSet, dropMissing, fillMissing, noteMissingFailure, regenerateSet, reopenSet, removeSet, renameActivity,
+  addSet, allTargetForms, renameSet, appendWords, applyAiHints, protectedHints, approveSet, dropMissing, fillMissing, noteMissingFailure, regenerateSet, reopenSet, removeSet, renameActivity,
   replaceWord, setBrief, setIllustration, splitApproved, toggleLock, toVocabSet, updateWord,
 } from "@/lib/studio/ops";
 import { normalize } from "@/lib/answer";
@@ -21,12 +21,15 @@ type ReqOf<T extends StudioData["task"]> = Extract<StudioRequest, { task: T }>;
 
 export function Workshop({
   initial,
+  initialSetId,
   ai,
   onBack,
   onSaved,
   onPlay,
 }: {
   initial: Activity;
+  /** Open with this set selected (from the Vocabulary Library's Edit button). */
+  initialSetId?: string;
   ai: AiStatus;
   onBack: () => void;
   onSaved: () => void;
@@ -39,7 +42,7 @@ export function Workshop({
   const [busy, setBusy] = useState<string | null>(null);
   const [busyWordId, setBusyWordId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "error" | "info"; text: string } | null>(null);
-  const [activeSetId, setActiveSetId] = useState<string | null>(initial.sets[0]?.id ?? null);
+  const [activeSetId, setActiveSetId] = useState<string | null>(initial.sets.find((s) => s.id === initialSetId)?.id ?? initial.sets[0]?.id ?? null);
   const [tab, setTab] = useState<"chat" | "sets">(initial.sets.length ? "sets" : "chat");
   const [approveProblems, setApproveProblems] = useState<string[]>([]);
   const [leaving, setLeaving] = useState(false);
@@ -369,6 +372,7 @@ export function Workshop({
           busyWordId={busyWordId}
           canGenerate={canGenerate}
           onSelect={(id) => { setActiveSetId(id); setApproveProblems([]); }}
+          onRenameSet={(s, t) => commit(renameSet(actRef.current, s, t))}
           onAddSet={() => run("Writing another set", () => doGenerate(actRef.current.brief, 1))}
           onRemoveSet={(id) => {
             const next = removeSet(actRef.current, id);

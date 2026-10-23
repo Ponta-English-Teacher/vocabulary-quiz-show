@@ -3,6 +3,8 @@
 import { SAMPLE_SET, type VocabSet } from "@/data/vocab";
 import { approvedSets } from "@/lib/studio/ops";
 import type { Activity } from "@/lib/studio/types";
+import type { LibraryList } from "@/lib/studio/library";
+import { StudyShareControls } from "../study/StudyShare";
 import { ConfirmButton, Notice, StorageNotice } from "./shared";
 
 function when(iso: string): string {
@@ -12,6 +14,9 @@ function when(iso: string): string {
 
 export function StudioHome({
   activities,
+  library,
+  onEditList,
+  onDeleteList,
   skipped,
   storageOk,
   message,
@@ -24,6 +29,9 @@ export function StudioHome({
   onCopySample,
 }: {
   activities: Activity[];
+  library: LibraryList[];
+  onEditList: (l: LibraryList) => void;
+  onDeleteList: (l: LibraryList) => void;
   skipped: number;
   storageOk: boolean;
   message: { kind: "error" | "info"; text: string } | null;
@@ -92,6 +100,38 @@ export function StudioHome({
           Nothing saved yet. Start a new activity and describe what you want — for example, <em>“B2 vocabulary about everyday physical actions.”</em>
         </p>
       ) : null}
+
+      <section aria-labelledby="library-title" className="library">
+        <div className="libhead">
+          <h2 id="library-title" className="studio-h">Vocabulary Library</h2>
+          <p className="note">Every approved list you have saved. Choose any of them when you host a class.</p>
+        </div>
+        {library.length === 0 ? (
+          <p className="empty">No approved lists yet. Approve a set (1–10 words) in an activity and it appears here.</p>
+        ) : (
+          <ul className="lineup">
+            {library.map((l) => (
+              <li key={l.key} className="lineup__row">
+                <div className="lineup__main">
+                  <h3 className="lineup__title">{l.title}</h3>
+                  <p className="lineup__meta">{l.count} word{l.count === 1 ? "" : "s"} · {l.words.map((w) => w.word).join(", ")}</p>
+                  <StudyShareControls source={l.key} title={l.title} words={l.words} />
+                </div>
+                <div className="lineup__actions">
+                  <button type="button" className="btn btn--small" onClick={() => onEditList(l)}>Edit</button>
+                  <ConfirmButton
+                    label="Delete"
+                    confirmText={`Delete the list “${l.title}”? This can't be undone. Your other lists aren't affected.`}
+                    confirmLabel="Delete list"
+                    onConfirm={() => onDeleteList(l)}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
 
       <StorageNotice />
     </section>
