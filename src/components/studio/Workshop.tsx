@@ -14,7 +14,6 @@ import { requestIllustration } from "@/lib/studio/illustrateClient";
 import { SET_SIZE, type Activity, type Brief, type StudioCommand } from "@/lib/studio/types";
 import { ChatPanel } from "./ChatPanel";
 import { SetPanel } from "./SetPanel";
-import { listKey } from "@/lib/studio/library";
 import { restrictionsFor, withRestrictionNote } from "@/lib/studio/restrictions";
 import { Notice, StorageNotice, type AiStatus } from "./shared";
 
@@ -374,7 +373,6 @@ export function Workshop({
           canGenerate={canGenerate}
           onSelect={(id) => { setActiveSetId(id); setApproveProblems([]); }}
           onRenameSet={(s, t) => commit(renameSet(actRef.current, s, t))}
-          shareFor={(s) => ({ source: listKey(actRef.current.id, s), title: `${actRef.current.title} — ${actRef.current.sets.find((x) => x.id === s)?.title.trim() || "Set"}` })}
           onAddSet={() => run("Writing another set", () => doGenerate(actRef.current.brief, 1))}
           onRemoveSet={(id) => {
             const next = removeSet(actRef.current, id);

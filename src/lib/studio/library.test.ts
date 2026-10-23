@@ -144,7 +144,7 @@ describe("editing and deleting one list leaves the others alone", () => {
     expect(deleteLibraryList(s, target.key)).toMatchObject({ ok: false }); // already gone
     expect(deleteLibraryList(s, "nope:nope")).toMatchObject({ ok: false });
   });
-  it("deletion needs confirmation: the library offers a Delete button, and the confirm step is the shared ConfirmButton (nothing is deleted on render)", () => {
+  it("deletion needs confirmation: the library offers Edit and Delete buttons, and the confirm step is the shared ConfirmButton (nothing is deleted on render)", () => {
     const { s } = seed();
     const lists = libraryLists(loadActivities(s).activities);
     let deleted = 0;
@@ -157,7 +157,7 @@ describe("editing and deleting one list leaves the others alone", () => {
     expect(html).toContain("Bathroom — Set 1");
     expect(html).toContain("10 words");
     expect(html).toContain("1 word ·");
-    expect(html).toContain("Share study page");
+    expect(html).not.toContain("Share study page"); // students study from the class link; no manual publishing
     expect(html).not.toContain("This can&#x27;t be undone. Your other lists"); // confirmation text appears only after pressing Delete
     expect(deleted).toBe(0);
   });

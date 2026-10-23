@@ -683,3 +683,9 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .study__ex { margin: 0; font: italic 1rem/1.45 var(--serif); color: var(--ink-dim); }
 .studyshare { display: grid; gap: 0.4rem; justify-items: start; margin-top: 0.4rem; }
 .libhead { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+
+/* ---- early finish (class bar) ------------------------------------------- */
+.endgame { display: grid; gap: 0.4rem; justify-items: center; text-align: center; padding: 0.5rem 0.75rem; border: 1px solid var(--gold); border-radius: 0.8rem; background: rgb(255 201 74 / 0.1); margin-bottom: 0.4rem; }
+.endgame p { margin: 0; font-size: 0.9rem; }
+.endgame__row { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+.endgame__open { justify-self: center; margin-bottom: 0.3rem; }

@@ -33,6 +33,8 @@ export interface Room {
   seats: [Seat | null, Seat | null];
   proposal: Proposal | null;
   game: GameState | null;
+  /** A pending early-finish request. Lives with the room, so it survives refreshes and reconnects. `declined`: the partner said no. */
+  endRequest?: { by: 0 | 1; declined?: boolean } | null;
   version: number;
   ops: string[];
   updatedAt: number;
@@ -104,7 +106,7 @@ export function parseAction(raw: unknown): ClientAction | null {
   const a = raw as Record<string, unknown>;
   switch (a.type) {
     case "PROPOSE_ROLES": return a.giver === "me" || a.giver === "partner" ? { type: "PROPOSE_ROLES", giver: a.giver } : null;
-    case "CONFIRM_ROLES": case "LEAVE": case "REVEAL_HINT": case "SKIP": case "NEXT": case "CONTINUE": case "PLAY_AGAIN":
+    case "CONFIRM_ROLES": case "LEAVE": case "REVEAL_HINT": case "SKIP": case "NEXT": case "CONTINUE": case "PLAY_AGAIN": case "REQUEST_END": case "CONFIRM_END": case "CANCEL_END":
       return { type: a.type };
     case "PICK": return typeof a.wordId === "string" && a.wordId.length < 60 ? { type: "PICK", wordId: a.wordId } : null;
     case "ADJUST_HINTS": return a.delta === 1 || a.delta === -1 ? { type: "ADJUST_HINTS", delta: a.delta } : null;
@@ -153,8 +155,40 @@ function lobbyAction(room: Room, words: VocabWord[] | null, seat: 0 | 1, action:
   return false;
 }
 
-function gameAction(room: Room, action: ClientAction): boolean {
+/** Both partners agree: finish THIS pair's game now. Scores are whatever finished rounds produced. */
+function endGame(room: Room): boolean {
+  const next = gameReducer(room.game!, { type: "END_EARLY" });
+  if (next === room.game) return false;
+  room.game = next;
+  room.endRequest = null;
+  return true;
+}
+
+function endAction(room: Room, seat: 0 | 1, action: ClientAction): boolean {
   const game = room.game!;
+  if (game.phase === "final") return false; // the result is recorded: nothing can change it
+  const req = room.endRequest ?? null;
+  const live = req && !req.declined ? req : null;
+  if (action.type === "REQUEST_END") {
+    if (live && live.by === seat) return false; // duplicate request
+    if (live) return endGame(room); // the partner had already asked: two requests are agreement (simultaneous presses)
+    room.endRequest = { by: seat };
+    return true;
+  }
+  if (action.type === "CONFIRM_END") return live && live.by !== seat ? endGame(room) : false;
+  if (action.type === "CANCEL_END") {
+    if (!req) return false;
+    if (req.by === seat) { room.endRequest = null; return true; } // withdraw, or dismiss a "declined" notice
+    if (req.declined) return false;
+    room.endRequest = { by: req.by, declined: true }; // the partner says "keep playing"
+    return true;
+  }
+  return false;
+}
+
+function gameAction(room: Room, seat: 0 | 1, action: ClientAction): boolean {
+  const game = room.game!;
+  if (action.type === "REQUEST_END" || action.type === "CONFIRM_END" || action.type === "CANCEL_END") return endAction(room, seat, action);
   let mapped: GameAction | null = null;
   switch (action.type) {
     case "PICK": mapped = { type: "PICK", wordId: action.wordId }; break;
@@ -169,12 +203,14 @@ function gameAction(room: Room, action: ClientAction): boolean {
       if (game.phase !== "final") return false;
       room.game = null;
       room.proposal = null;
+      room.endRequest = null;
       return true;
   }
   if (!mapped) return false;
   const next = gameReducer(game, mapped);
   if (next === game) return false; // wrong phase / invalid → nothing changes (a second answer can't score twice)
   room.game = next;
+  if (next.phase === "final") room.endRequest = null;
   return true;
 }
 
@@ -213,7 +249,7 @@ export function applyAction(room: Room, words: VocabWord[] | null, seat: 0 | 1, 
   const denied = permission(action, role);
   if (denied) return { error: denied };
 
-  const applied = room.game ? gameAction(room, action) : lobbyAction(room, words, seat, action);
+  const applied = room.game ? gameAction(room, seat, action) : lobbyAction(room, words, seat, action);
   if (!applied) return { applied: false, duplicate: false };
   if (typeof opId === "string" && opId) {
     room.ops.push(opId);
@@ -221,6 +257,13 @@ export function applyAction(room: Room, words: VocabWord[] | null, seat: 0 | 1, 
   }
   bump(room, now);
   return { applied: true, left: action.type === "LEAVE" };
+}
+
+function endViewFor(room: Room, seat: 0 | 1): ClassView["end"] {
+  const req = room.endRequest;
+  if (!req || !room.game || room.game.phase === "final") return null;
+  if (req.by === seat) return req.declined ? "declined" : "requested-by-you";
+  return req.declined ? null : "requested-by-partner";
 }
 
 /** What this player's phone is told. `partnerConnected`: true/false, or null when there is no partner yet. */
@@ -247,6 +290,7 @@ export function buildView(room: Room, seat: 0 | 1, partnerConnected: boolean | n
           youAreGiver: prop.giverSeat === seat,
         }
       : null,
+    end: endViewFor(room, seat),
     game: room.game && role ? redactForRole(room.game, role) : null,
   };
 }

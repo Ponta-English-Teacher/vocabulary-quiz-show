@@ -21,11 +21,14 @@ export function JoinForm({
   error,
   busy,
   onJoin,
+  studyHref,
 }: {
   title: string;
   error: string | null;
   busy: boolean;
   onJoin: (name: string, group: string) => void;
+  /** Study Vocabulary for this class (open before and after the game). */
+  studyHref?: string;
 }) {
   const [name, setName] = useState("");
   const [group, setGroup] = useState("");
@@ -68,15 +71,16 @@ export function JoinForm({
         </label>
         {error ? <p className="feedback feedback--wrong" role="alert">{error}</p> : null}
         <button type="submit" className="btn btn--hero" disabled={busy || !name.trim() || !group}>
-          {busy ? "Joining…" : "Join group"}
+          {busy ? "Joining…" : "Play Quiz"}
         </button>
+        {studyHref ? <a className="btn btn--ghost" href={studyHref}>Study Vocabulary</a> : null}
         <p className="note">Your partner enters the same group number on their own phone. Only two players can share a group.</p>
       </form>
     </main>
   );
 }
 
-export function Waiting({ view, onLeave }: { view: ClassView; onLeave: () => void }) {
+export function Waiting({ view, onLeave, studyHref }: { view: ClassView; onLeave: () => void; studyHref?: string }) {
   return (
     <main className="screen lobby" aria-live="polite">
       <p className="eyebrow">Group</p>
@@ -92,12 +96,13 @@ export function Waiting({ view, onLeave }: { view: ClassView; onLeave: () => voi
         </li>
       </ul>
       <p className="note">Ask your partner to open the same link and enter group <b>{view.group}</b>.</p>
+      {studyHref ? <a className="btn btn--ghost" href={studyHref}>Study Vocabulary</a> : null}
       <button type="button" className="btn btn--link" onClick={onLeave}>Wrong group? Leave</button>
     </main>
   );
 }
 
-export function Roles({ view, act }: { view: ClassView; act: (a: ClientAction) => void }) {
+export function Roles({ view, act, studyHref }: { view: ClassView; act: (a: ClientAction) => void; studyHref?: string }) {
   const partner = view.partner!;
   const p = view.proposal;
   return (
@@ -145,6 +150,7 @@ export function Roles({ view, act }: { view: ClassView; act: (a: ClientAction) =
           </div>
         </>
       )}
+      {studyHref ? <a className="btn btn--ghost" href={studyHref}>Study Vocabulary</a> : null}
     </main>
   );
 }

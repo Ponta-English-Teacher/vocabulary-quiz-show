@@ -4,7 +4,6 @@ import { SAMPLE_SET, type VocabSet } from "@/data/vocab";
 import { approvedSets } from "@/lib/studio/ops";
 import type { Activity } from "@/lib/studio/types";
 import type { LibraryList } from "@/lib/studio/library";
-import { StudyShareControls } from "../study/StudyShare";
 import { ConfirmButton, Notice, StorageNotice } from "./shared";
 
 function when(iso: string): string {
@@ -57,10 +56,10 @@ export function StudioHome({
       <section aria-labelledby="library-title" className="library">
         <div className="libhead">
           <h2 id="library-title" className="studio-h">Vocabulary Library</h2>
-          <p className="note">Every approved list you have saved. Choose any of them when you host a class.</p>
+          <p className="note">Every approved list you have saved. Choose any of them when you host a class; students study it from the class link.</p>
         </div>
         {library.length === 0 ? (
-          <p className="empty">No approved lists yet. Open an activity, then press <b>Approve this set</b> in its lineup, and the list appears here with its Share and Delete buttons.</p>
+          <p className="empty">No approved lists yet. Open an activity, then press <b>Approve this set</b> in its lineup, and the list appears here with its Edit and Delete buttons.</p>
         ) : (
           <ul className="lineup">
             {library.map((l) => (
@@ -69,7 +68,6 @@ export function StudioHome({
                   <h3 className="lineup__title">{l.title}</h3>
                   <p className="lineup__meta">{l.count} word{l.count === 1 ? "" : "s"} · {l.words.map((w) => w.word).join(", ")}</p>
                   {l.problems.length ? <p className="note">Needs attention before hosting: {l.problems[0]}</p> : null}
-                  <StudyShareControls source={l.key} title={l.title} words={l.words} />
                 </div>
                 <div className="lineup__actions">
                   <button type="button" className="btn btn--small" onClick={() => onEditList(l)}>Edit</button>

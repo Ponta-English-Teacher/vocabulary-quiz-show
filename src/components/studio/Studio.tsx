@@ -6,8 +6,6 @@ import { fetchAiStatus } from "@/lib/studio/ai/client";
 import { activityFromSample, approvedSets, createActivity, toVocabSet } from "@/lib/studio/ops";
 import { deleteActivity, duplicateActivity, getBrowserStorage, loadActivities, saveActivity } from "@/lib/studio/storage";
 import type { Activity } from "@/lib/studio/types";
-import { unpublishStudy } from "@/lib/study/client";
-import { loadShares, removeShare } from "@/lib/study/shares";
 import { deleteLibraryList, libraryLists } from "@/lib/studio/library";
 import { AiBadge, type AiStatus } from "./shared";
 import { StudioHome } from "./StudioHome";
@@ -63,8 +61,6 @@ export function Studio({ onExit, onPlay }: { onExit: () => void; onPlay: (set: V
           onEditList={(l) => { const a = activities.find((x) => x.id === l.activityId); if (a) open(a, l.setId); }}
           onDeleteList={(l) => {
             const r = deleteLibraryList(getBrowserStorage(), l.key);
-            // A deleted list's own study page is taken down with it (other lists' and classes' pages are untouched).
-            if (r.ok) for (const sh of loadShares(getBrowserStorage()).filter((x) => x.source === l.key)) void unpublishStudy(sh.token).then((u) => { if (u.ok) removeShare(getBrowserStorage(), sh.token); });
             setMessage(r.ok ? { kind: "info", text: `Deleted the list “${r.title}”. Your other lists weren't touched.` } : { kind: "error", text: r.error });
             refresh();
           }}

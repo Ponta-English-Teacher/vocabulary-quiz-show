@@ -53,13 +53,13 @@ export function ClassApp({ activityId }: { activityId: string }) {
       </main>
     );
   } else if (s.status === "join" || !view) {
-    body = <JoinForm title={s.title} error={s.error} busy={s.busy} onJoin={s.join} />;
+    body = <JoinForm title={s.title} error={s.error} busy={s.busy} onJoin={s.join} studyHref={`/class/${activityId}/study`} />;
   } else if (view.stage === "waiting") {
     body = (
-      <Waiting view={view} onLeave={() => void s.act({ type: "LEAVE" })} />
+      <Waiting view={view} onLeave={() => void s.act({ type: "LEAVE" })} studyHref={`/class/${activityId}/study`} />
     );
   } else if (view.stage === "roles" || !game || !view.role) {
-    body = <Roles view={view} act={(a) => void s.act(a)} />;
+    body = <Roles view={view} act={(a) => void s.act(a)} studyHref={`/class/${activityId}/study`} />;
   } else {
     body = (
       <>
@@ -69,7 +69,7 @@ export function ClassApp({ activityId }: { activityId: string }) {
         {game.phase === "round" && view.role === "giver" ? <GiverRound state={game} dispatch={dispatch} onRequestIllustration={s.requestIllustration} /> : null}
         {game.phase === "round" && view.role === "taker" ? <TakerRound state={game} dispatch={dispatch} /> : null}
         {game.phase === "reveal" ? <Reveal state={game} onNext={() => dispatch({ type: "NEXT" })} /> : null}
-        {game.phase === "final" ? <Final state={game} onAgain={() => dispatch({ type: "RESET" })} /> : null}
+        {game.phase === "final" ? <Final state={game} onAgain={() => dispatch({ type: "RESET" })} studyHref={`/class/${activityId}/study`} /> : null}
       </>
     );
   }
@@ -78,7 +78,7 @@ export function ClassApp({ activityId }: { activityId: string }) {
     <Stage tone={tone}>
       <SoundToggle />
       <div className="frame">{body}</div>
-      {s.status === "active" && view ? <ClassBar view={view} connection={s.connection} notice={s.error} /> : null}
+      {s.status === "active" && view ? <ClassBar view={view} connection={s.connection} notice={s.error} act={(a) => void s.act(a)} /> : null}
     </Stage>
   );
 }

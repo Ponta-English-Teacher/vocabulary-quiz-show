@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import QRCode from "qrcode";
 import { StudyList } from "@/components/study/StudyList";
-import { StudyShareControls } from "@/components/study/StudyShare";
 import { ClassService } from "@/lib/class/service";
 import { MemoryKV } from "@/lib/class/kv";
 import { selectWords } from "@/lib/playCount";
@@ -11,7 +10,6 @@ import { SAMPLE_SET, type VocabWord } from "@/data/vocab";
 import * as listRoute from "../../app/api/study/route";
 import * as tokenRoute from "../../app/api/study/[token]/route";
 import { StudyService, STUDY_TTL } from "./service";
-import { addShare, loadShares, removeShare, SHARES_KEY, type StudyShare } from "./shares";
 
 const word = (n: string, over: Partial<VocabWord> = {}): VocabWord => ({
   id: `id-${n}`, word: n, accept: [`${n}s`], partOfSpeech: "noun", category: "Kitchen", cefr: "A2",
@@ -22,7 +20,6 @@ const word = (n: string, over: Partial<VocabWord> = {}): VocabWord => ({
 });
 const LIST_A = ["colander", "whisk", "ladle"].map((n) => word(n));
 const LIST_B = ["towel", "drawer"].map((n) => word(n));
-const memory = () => { const d: Record<string, string> = {}; return { getItem: (k: string) => d[k] ?? null, setItem: (k: string, v: string) => { d[k] = v; } }; };
 
 class SpyKV extends MemoryKV {
   writes: { key: string; value: string }[] = [];
@@ -199,30 +196,11 @@ describe("the student page", () => {
   });
 });
 
-describe("teacher sharing controls, link and QR code", () => {
-  it("start unshared with an explicit 'Share study page' button (nothing is published automatically)", () => {
-    const html = renderToStaticMarkup(h(StudyShareControls, { source: "list-1", title: "T", words: LIST_A }));
-    expect(html).toContain("Share study page");
-    expect(html).not.toContain("Stop sharing");
-  });
+describe("QR codes for study links", () => {
   it("a study link can be turned into a scannable QR code", async () => {
     const url = "https://vocabulary-quiz-show.vercel.app/study/AAAAAAAAAAAAAAAAAAAAAA";
     const png = await QRCode.toDataURL(url, { errorCorrectionLevel: "M" });
     expect(png.startsWith("data:image/png;base64,")).toBe(true);
-  });
-  it("the teacher's record of shares: per source, expiring, removable", () => {
-    const s = memory();
-    const mk = (token: string, source: string, expiresAt: number): StudyShare => ({ token, source, title: "T", words: 3, url: `http://x/study/${token}`, createdAt: 1, expiresAt });
-    addShare(s, mk("t1", "a:1", 2000), 1000);
-    addShare(s, mk("t2", "class:9", 2000), 1000);
-    addShare(s, mk("t3", "a:2", 500), 100);
-    expect(loadShares(s, 1000).map((x) => x.token).sort()).toEqual(["t1", "t2"]); // t3 already expired
-    expect(loadShares(s, 1000).find((x) => x.source === "a:1")?.token).toBe("t1");
-    removeShare(s, "t1", 1000);
-    expect(loadShares(s, 1000).map((x) => x.token)).toEqual(["t2"]);
-    expect(loadShares(null)).toEqual([]);
-    s.setItem(SHARES_KEY, "not json");
-    expect(loadShares(s)).toEqual([]);
   });
 });
 

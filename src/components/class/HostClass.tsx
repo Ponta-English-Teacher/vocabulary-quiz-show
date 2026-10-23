@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SAMPLE_SET, type VocabWord } from "@/data/vocab";
+import { SAMPLE_SET } from "@/data/vocab";
 import { libraryLists, type LibraryList } from "@/lib/studio/library";
 import { getBrowserStorage, loadActivities } from "@/lib/studio/storage";
 import { pickClassroomUrls } from "@/lib/class/url";
@@ -9,7 +9,6 @@ import { clearPasscode, teacherHeaders } from "@/lib/teacher/client";
 import { clampPlayCount, DEFAULT_PLAY_COUNT, selectWords } from "@/lib/playCount";
 import { PlayCount } from "../PlayCount";
 import { QrCode } from "../QrCode";
-import { StudyShareControls } from "../study/StudyShare";
 import { TeacherPasscodeForm } from "../TeacherPasscodeForm";
 import { useTeacherAccess } from "../useTeacherAccess";
 
@@ -34,8 +33,6 @@ export function HostClass() {
   const [count, setCount] = useState(DEFAULT_PLAY_COUNT);
   const playCount = clampPlayCount(count, available || DEFAULT_PLAY_COUNT);
   const [links, setLinks] = useState<{ primary: string; others: string[] } | null>(null);
-  /** What this class was created with: the study page is published from exactly these words. */
-  const [hosted, setHosted] = useState<{ id: string; title: string; words: VocabWord[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -54,7 +51,6 @@ export function HostClass() {
       const j = await res.json();
       if (res.status === 401) clearPasscode();
       if (!j.ok) throw new Error(j.error?.message ?? "Could not create the class link.");
-      setHosted({ id: String(j.id), title: set.title, words: picked });
       setLinks(pickClassroomUrls({ origin: window.location.origin, hostname: window.location.hostname, path: j.path, lanUrls: j.lanUrls ?? [] }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create the class link.");
@@ -80,12 +76,12 @@ export function HostClass() {
       <fieldset className="hostclass__choose">
         <legend className="field__label">Choose an Activity</legend>
         <label className="hostclass__opt">
-          <input type="radio" name="host-activity" checked={choice === "preset"} onChange={() => { setChoice("preset"); setCount(DEFAULT_PLAY_COUNT); setLinks(null); setHosted(null); }} />
+          <input type="radio" name="host-activity" checked={choice === "preset"} onChange={() => { setChoice("preset"); setCount(DEFAULT_PLAY_COUNT); setLinks(null); }} />
           <span><b>Preset Vocabulary</b> — {SAMPLE_SET.title} · {SAMPLE_SET.words.length} words</span>
         </label>
         {lists.map((l, i) => (
           <label key={l.key} className="hostclass__opt">
-            <input type="radio" name="host-activity" checked={choice === l.key} onChange={() => { setChoice(l.key); setCount(DEFAULT_PLAY_COUNT); setLinks(null); setHosted(null); }} />
+            <input type="radio" name="host-activity" checked={choice === l.key} onChange={() => { setChoice(l.key); setCount(DEFAULT_PLAY_COUNT); setLinks(null); }} />
             <span><b>{l.title}</b> — {l.count} word{l.count === 1 ? "" : "s"}{i === 0 ? " · most recent" : ""}</span>
           </label>
         ))}
@@ -94,7 +90,7 @@ export function HostClass() {
       {set ? (
         <>
           <p className="note"><b>{choice === "preset" ? "Preset Vocabulary" : set.title}</b> — {available} available</p>
-          <PlayCount available={available} value={playCount} onChange={(n) => { setCount(n); setLinks(null); setHosted(null); }} />
+          <PlayCount available={available} value={playCount} onChange={(n) => { setCount(n); setLinks(null); }} />
         </>
       ) : null}
       <button type="button" className="btn btn--ghost" onClick={create} disabled={busy || !set || access.status === "loading"}>
@@ -105,9 +101,7 @@ export function HostClass() {
         <div className="hostclass__links" role="status">
           <QrCode url={links.primary} />
           <p className="note">Students scan the code (or open the link) on their own phones, then enter a name and a group number. Keep this app running while they play.</p>
-          {hosted ? (
-            <StudyShareControls source={`class:${hosted.id}`} title={hosted.title} words={hosted.words} />
-          ) : null}
+          <p className="note">Students can also tap <b>Study Vocabulary</b> on this same class page, before and after their game. It shows exactly these words (not during their rounds).</p>
           {[links.primary, ...links.others].map((u) => (
             <p key={u} className="hostclass__url">
               <a href={u}>{u}</a>

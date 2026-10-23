@@ -7,6 +7,8 @@ import {
   applyAction, buildView, claimSeat, cleanName, cloneRoom, fail, hashToken, markIllustration, newRoom, normalizeGroup, other, parseAction,
   seatFor, type ClassActivity, type Fail, type Room,
 } from "./engine";
+import { toStudyWord } from "@/lib/study/service";
+import type { StudyWord } from "@/lib/study/types";
 import { KvConfigError, KvError, kvFromEnv, versionOf, type KV } from "./kv";
 
 /**
@@ -146,6 +148,28 @@ export class ClassService {
       const a = await this.loadActivity(id);
       return a ? { title: a.title, wordCount: a.words.length } : null;
     });
+  }
+
+  /**
+   * Study access: the vocabulary of THIS class activity, as study fields only (see toStudyWord) — no teacher publication step,
+   * the class link already identifies the list. A player who has joined and whose game is under way is refused until the
+   * game has ended, so the full list is not offered during guessing rounds. Before joining, in the lobby and after the
+   * final result it is open. (Someone who has not joined cannot be told apart from anyone else, so this guard protects
+   * the app's own screens; it cannot stop a determined student opening the link in a second browser.)
+   */
+  async getStudy(input: { activityId: string; group?: unknown; token?: unknown }): Promise<{ ok: true; title: string; words: StudyWord[] } | Fail> {
+    return (await this.guard(async () => {
+      const activity = await this.loadActivity(input.activityId);
+      if (!activity) return fail("no_activity", NO_ACTIVITY);
+      const group = normalizeGroup(input.group);
+      if (group && typeof input.token === "string" && input.token) {
+        const cur = parseRoom(await this.kv.get(roomKey(input.activityId, group)));
+        if (cur && seatFor(cur.room, input.token) !== null && cur.room.game && cur.room.game.phase !== "final") {
+          return fail("forbidden", "Study Vocabulary opens again when your game ends.");
+        }
+      }
+      return { ok: true as const, title: activity.title, words: activity.words.map(toStudyWord) };
+    })) as { ok: true; title: string; words: StudyWord[] } | Fail;
   }
 
   /**

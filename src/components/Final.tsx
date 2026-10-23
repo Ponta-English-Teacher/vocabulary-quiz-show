@@ -9,10 +9,9 @@ import { Bulbs } from "./Stage";
 
 const SUSPENSE_MS = 2600;
 
-export function Final({ state, onAgain }: { state: GameState; onAgain: () => void }) {
+export function Final({ state, onAgain, studyHref }: { state: GameState; onAgain: () => void; studyHref?: string }) {
   const reduced = usePrefersReducedMotion();
   const [revealed, setRevealed] = useState(false);
-  const result = getFinalResult(state.players);
 
   useEffect(() => {
     if (reduced) {
@@ -35,14 +34,21 @@ export function Final({ state, onAgain }: { state: GameState; onAgain: () => voi
   if (!revealed) {
     return (
       <main className="screen final final--wait" aria-live="polite">
-        <p className="eyebrow">{state.words.length === 1 ? "One word later…" : `${state.words.length} words later…`}</p>
+        <p className="eyebrow">{state.history.length === 1 ? "One word later…" : `${state.history.length} words later…`}</p>
         <h2 className="drumroll">And the winner is<span className="dots"><i>.</i><i>.</i><i>.</i></span></h2>
       </main>
     );
   }
 
+  return <FinalScreen state={state} shown={shown} onAgain={onAgain} studyHref={studyHref} />;
+}
+
+/** The revealed result. Everything on it comes from the shared game state, so both phones show the same thing. */
+export function FinalScreen({ state, shown, onAgain, studyHref }: { state: GameState; shown: number[]; onAgain: () => void; studyHref?: string }) {
+  const result = getFinalResult(state.players);
   const winnerName = result.kind === "winner" ? state.players[result.winner].name : null;
   const solved = state.history.filter((h) => h.outcome === "solved").length;
+  const completed = state.history.length;
 
   return (
     <main className="screen final" aria-live="polite">
@@ -62,6 +68,9 @@ export function Final({ state, onAgain }: { state: GameState; onAgain: () => voi
         ))}
       </div>
 
+      {state.endedEarly ? (
+        <p className="tagline" role="status">Game ended early — {completed} of {state.words.length} word{state.words.length === 1 ? "" : "s"} completed. Only finished words scored.</p>
+      ) : null}
       <p className="note">{solved} of {state.words.length} words solved</p>
 
       <ul className="recap">
@@ -77,6 +86,7 @@ export function Final({ state, onAgain }: { state: GameState; onAgain: () => voi
       </ul>
 
       <button type="button" className="btn btn--hero" onClick={onAgain}>Play again</button>
+      {studyHref ? <a className="btn btn--ghost" href={studyHref}>Study Vocabulary</a> : null}
     </main>
   );
 }

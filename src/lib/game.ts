@@ -71,6 +71,8 @@ export interface GameState {
   history: RoundResult[];
   /** Why the 'switch' screen is showing. */
   switchKind: "intro" | "swap" | null;
+  /** True when the pair ended the game before every word was played (both partners agreed). Absent for a normal finish. */
+  endedEarly?: boolean;
 }
 
 export type GameAction =
@@ -88,6 +90,8 @@ export type GameAction =
   | { type: "SKIP" }
   | { type: "NEXT" }
   | { type: "CONTINUE" }
+  /** Both partners agreed to stop. Only finished rounds have scored; an unfinished round scores nothing. */
+  | { type: "END_EARLY" }
   | { type: "RESET" };
 
 export const MAX_NAME_LENGTH = 16;
@@ -291,6 +295,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         giver: takerOf(state.giver),
         currentWordId: null,
       };
+    }
+
+    case "END_EARLY": {
+      // Allowed at any point of a running game; once the final result exists nothing changes it again.
+      if (state.phase === "welcome" || state.phase === "final") return state;
+      // Scores only ever change in finishRound, so a round in progress has awarded nothing and awards nothing now.
+      return { ...state, phase: "final", endedEarly: true, currentWordId: null, revealedHints: 0, hintsUsed: 0, illustrationUsed: false, wrongGuesses: 0, feedback: null, switchKind: null };
     }
 
     case "RESET":
