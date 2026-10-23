@@ -440,18 +440,20 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .pane--sets .pane__kicker { color: var(--gold); }
 .brief { font-size: 0.9rem; color: var(--ink-dim); padding: 0.4rem 0 0.8rem; }
 .brief__label { font: 700 0.7rem/1 var(--display); letter-spacing: 0.25em; text-transform: uppercase; color: var(--cyan); margin-right: 0.4rem; }
-.chat { max-height: min(52vh, 34rem); min-height: 12rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.1rem; padding: 0.4rem 0.4rem 0.6rem 0; scroll-behavior: smooth; }
-.chat__intro p { font: italic 1.15rem/1.45 var(--serif); color: var(--ink-dim); }
+.chat { max-height: min(60vh, 40rem); min-height: 12rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.1rem; padding: 0.4rem 0.4rem 0.6rem 0; scroll-behavior: smooth; }
+.chat__intro p { font: 400 1.05rem/1.55 var(--body); color: var(--ink); }
 .ideas { display: grid; gap: 0.2rem; margin-top: 0.8rem; }
 .idea { text-align: left; width: 100%; background: none; border: 0; border-left: 2px solid rgb(56 225 255 / 0.4); padding: 0.55rem 0.8rem; min-height: 2.75rem; font-size: 0.95rem; color: var(--ink); transition: background 0.2s, border-color 0.2s; }
 .idea:hover:not(:disabled) { background: rgb(56 225 255 / 0.1); border-left-color: var(--cyan); }
 .msg { display: flex; flex-direction: column; gap: 0.2rem; animation: rise 0.35s both; }
 .msg__who { font: 700 0.68rem/1 var(--display); letter-spacing: 0.28em; text-transform: uppercase; }
-.msg p { line-height: 1.5; }
+.msg p { margin: 0; font: 400 1.0625rem/1.6 var(--body); font-style: normal; color: var(--ink); overflow-wrap: anywhere; white-space: pre-wrap; }
+.msg p + p { margin-top: 0.6rem; }
 .msg--ai { border-left: 3px solid var(--cyan); padding-left: 0.9rem; }
 .msg--ai .msg__who { color: var(--cyan); }
-.msg--ai p { font: italic 1.12rem/1.5 var(--serif); }
-.msg--teacher { border-right: 3px solid var(--gold); padding-right: 0.9rem; text-align: right; align-items: flex-end; }
+.msg--ai p { color: #fff; }
+.msg--teacher { border-right: 3px solid var(--gold); padding-right: 0.9rem; text-align: left; align-items: flex-end; margin-left: 12%; }
+.msg--teacher p { background: rgb(255 201 74 / 0.08); border-radius: 0.6rem; padding: 0.5rem 0.75rem; }
 .msg--teacher .msg__who { color: var(--gold); }
 .composer { margin-top: 0.8rem; display: grid; gap: 0.5rem; }
 .composer textarea { min-height: 4.2rem; }
