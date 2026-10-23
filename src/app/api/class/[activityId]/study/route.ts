@@ -12,5 +12,5 @@ export async function GET(request: Request, ctx: { params: Promise<{ activityId:
   const url = new URL(request.url);
   const r = await getClassService().getStudy({ activityId, group: url.searchParams.get("group"), token: bearer(request) });
   if (!r.ok) return errorResponse(r.code, r.message);
-  return Response.json({ ok: true, title: r.title, words: r.words }, { headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" } });
+  return Response.json({ ok: true, title: r.title, words: r.words, translating: r.translating }, { headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" } });
 }

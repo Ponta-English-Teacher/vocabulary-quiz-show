@@ -117,14 +117,18 @@ describe("Japanese on the Study Page, end to end", () => {
     expect(text).not.toMatch(/hints|giverInfo|Teachers and students look/);
     const html = renderToStaticMarkup(h(StudyList, { title: "Classroom", words: s.words }));
     for (const w of CLASSROOM) expect(html).toContain(`>${w}<`);
-    expect(html).toContain("机 / デスク");
-    expect(html).toContain("掲示板");
+    // students start with English only: the Japanese is in the data but not on the page until they ask
+    expect(html).not.toContain("机");
+    expect(html).not.toContain("掲示板");
+    expect((html.match(/>Show Japanese</g) ?? []).length).toBe(9);
     expect(html).not.toContain("Japanese not added yet");
-    expect(html).toContain("Hide Japanese");
+    expect(html).toContain("Show All Japanese");
+    expect(html).toContain("Hide All Japanese");
   });
   it("Show/Hide: hidden mode shows a button instead of the Japanese; a missing translation is stated in both modes", () => {
     const shown = renderToStaticMarkup(h(StudyJapanese, { ja: ["机"], hidden: false }));
     expect(shown).toContain("机");
+    expect(shown).toContain("Hide Japanese");
     expect(shown).not.toContain("Show Japanese");
     const hidden = renderToStaticMarkup(h(StudyJapanese, { ja: ["机"], hidden: true }));
     expect(hidden).not.toContain("机");
@@ -135,13 +139,12 @@ describe("Japanese on the Study Page, end to end", () => {
       expect(missing).not.toContain("Show Japanese");
     }
   });
-  it("the page tells students how many words lack Japanese, and still offers the Hide/Show control", () => {
+  it("the page tells students how many words lack Japanese, and still offers the Show/Hide All controls", () => {
     const words = [{ word: "desk", partOfSpeech: "noun", meaning: "m", ja: ["机"], example: "" }, { word: "wall", partOfSpeech: "noun", meaning: "m", ja: [], example: "" }];
     const html = renderToStaticMarkup(h(StudyList, { title: "T", words }));
-    expect(html).toContain("Japanese isn&#x27;t added yet for 1 word.");
+    expect(html).toContain("Japanese isn&#x27;t available yet for 1 word.");
     expect(html).toContain("Japanese not added yet");
-    expect(html).toContain("Hide Japanese");
-    expect(html).toContain('aria-pressed="false"');
+    expect(html).toContain("Hide All Japanese");
   });
   it("existing saved lists without Japanese are NOT filled in: they show 'not added yet' and are flagged to the teacher", async () => {
     const store = memory();

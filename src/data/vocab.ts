@@ -61,6 +61,11 @@ export interface VocabWord {
    * Taker (or the Giver) while the word is in play. Empty or missing = no Japanese credit for this word.
    */
   ja?: string[];
+  /**
+   * Japanese meanings for the student STUDY page only. Filled in automatically for vocabulary that has no `ja`, and teacher-editable.
+   * Never used for scoring and never sent to a player's phone during a game (the game strips it when it starts).
+   */
+  studyJa?: string[];
 }
 
 /** Giver-only support for explaining a word naturally. Every field is optional and adapts to the kind of word. */

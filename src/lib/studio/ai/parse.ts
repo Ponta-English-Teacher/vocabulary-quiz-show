@@ -143,6 +143,13 @@ export function parseStudioRequest(body: unknown): StudioRequest {
       return { task: "replace-word", brief, current: word(body.current), exclude: strList(body.exclude, 200, 60), instruction, forceMock };
     case "regenerate-hints":
       return { task: "regenerate-hints", brief, word: word(body.word), instruction, forceMock };
+    case "fill-japanese": {
+      const words = (Array.isArray(body.words) ? body.words : []).slice(0, 30).flatMap((w) =>
+        isObj(w) && typeof w.word === "string" && w.word.trim() ? [{ word: clip(w.word, 60), partOfSpeech: clip(w.partOfSpeech, 20), meaning: clip(w.meaning, 300) }] : [],
+      );
+      if (!words.length) throw bad("No words to translate.");
+      return { task: "fill-japanese", brief, words, forceMock };
+    }
     default:
       throw bad("Unknown task.");
   }

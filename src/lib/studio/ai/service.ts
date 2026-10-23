@@ -1,13 +1,14 @@
 import type { VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
-import { coerceJa, hintProblems, parseGeneratedWords } from "../validation";
+import { hintProblems, parseGeneratedWords } from "../validation";
+import { translateJapanese } from "./japanese";
 import { restrictionsFor, withRestrictionNote } from "../restrictions";
 import { mockApproved, mockChat, mockGenerate, mockHints, mockReplace } from "./mock";
 import { callOpenAIJson, DEFAULT_MODEL, type FetchLike } from "./openai";
 import { mergeAiCandidates } from "../candidates";
 import type { Brief, ChatResult } from "../types";
 import { APPROVAL_RE, DISCUSS_FIRST_RE, enforceApproval, enforceMixture, parseChatResult, parseHints, parseStudioRequest } from "./parse";
-import { approvedPrompt, chatPrompt, generatePrompt, hintsPrompt, japanesePrompt, replacePrompt } from "./prompts";
+import { approvedPrompt, chatPrompt, generatePrompt, hintsPrompt, replacePrompt } from "./prompts";
 import { AiError, type AiMode, type StudioData, type StudioRequest, type StudioResponse } from "./types";
 
 /** At most this many calls to fill ONE set (cost cap), asking a few extra items each time. */
@@ -99,6 +100,8 @@ function runMock(req: StudioRequest, deps: ServiceDeps): StudioData {
     }
     case "replace-word":
       return { task: "replace-word", word: mockReplace(req.brief, req.current, req.exclude, rng) };
+    case "fill-japanese":
+      return { task: "fill-japanese", ja: {} }; // the demo AI has no translations to offer
     case "regenerate-hints":
       return { task: "regenerate-hints", hints: mockHints(req.word) };
   }
@@ -107,7 +110,7 @@ function runMock(req: StudioRequest, deps: ServiceDeps): StudioData {
 async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioData> {
   const cfg = { apiKey: deps.apiKey!, model: deps.model || DEFAULT_MODEL, fetchImpl: deps.fetchImpl };
   // The teacher's checkable hint restrictions (brief notes, then this request's instruction as the newest word).
-  const restrictions = req.task === "chat" ? [] : restrictionsFor(req.brief.learnerFocus, req.instruction);
+  const restrictions = req.task === "chat" ? [] : restrictionsFor(req.brief.learnerFocus, "instruction" in req ? req.instruction : undefined);
 
   switch (req.task) {
     case "chat": {
@@ -214,6 +217,12 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
       throw new AiError("malformed", "The AI could not produce a valid replacement. The original word was kept.");
     }
 
+    case "fill-japanese": {
+      // Study-page translations for words that have none. One request, only for the words sent; nothing else is touched.
+      const table = await translateJapanese(cfg, req.words);
+      return { task: "fill-japanese", ja: table };
+    }
+
     case "regenerate-hints": {
       let last: AiError | null = null;
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -242,12 +251,10 @@ async function fillJapanese(cfg: { apiKey: string; model: string; fetchImpl?: Fe
   const need = words.filter((w) => !(w.ja ?? []).some((j) => j.trim()));
   if (!need.length) return;
   try {
-    const raw = (await callOpenAIJson(cfg, japanesePrompt(need))) as { ja?: Record<string, unknown> };
-    const table = raw && typeof raw.ja === "object" && raw.ja ? raw.ja : {};
-    const byWord = new Map(Object.entries(table).map(([k, v]) => [normalize(k), v]));
+    const table = await translateJapanese(cfg, need);
     for (const w of need) {
-      const list = coerceJa(byWord.get(normalize(w.word)));
-      if (list.length) w.ja = list;
+      const list = table[normalize(w.word)];
+      if (list?.length) w.ja = list;
     }
   } catch {
     /* keep the words as written */

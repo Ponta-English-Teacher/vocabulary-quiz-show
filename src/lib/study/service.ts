@@ -24,8 +24,10 @@ const fail = (code: StudyFail["code"], message: string): StudyFail => ({ ok: fal
 const NOT_FOUND = "This study link isn't valid, or it has expired or been taken down. Ask your teacher for a new link.";
 
 /** The study fields of a word, and nothing else. */
-export function toStudyWord(w: { word: string; partOfSpeech: string; meaning: string; example: string; ja?: string[] }): StudyWord {
-  return { word: w.word, partOfSpeech: w.partOfSpeech, meaning: w.meaning, ja: (w.ja ?? []).filter((j) => j.trim()), example: w.example.trim() };
+/** Study meaning: the teacher/AI study translation if there is one, otherwise the approved Japanese answers. */
+export function toStudyWord(w: { word: string; partOfSpeech: string; meaning: string; example: string; ja?: string[]; studyJa?: string[] }): StudyWord {
+  const study = (w.studyJa ?? []).filter((j) => j.trim());
+  return { word: w.word, partOfSpeech: w.partOfSpeech, meaning: w.meaning, ja: study.length ? study : (w.ja ?? []).filter((j) => j.trim()), example: w.example.trim() };
 }
 
 export class StudyService {

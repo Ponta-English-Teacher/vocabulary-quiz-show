@@ -12,7 +12,9 @@ export type StudioRequest =
   | (Common & { task: "chat"; messages: ChatMessage[]; context?: SetContext })
   | (Common & { task: "generate"; count: number; exclude: string[]; /** Teacher-approved words to use exactly, unchanged. */ approved?: string[]; instruction?: string })
   | (Common & { task: "replace-word"; current: VocabWord; exclude: string[]; instruction?: string })
-  | (Common & { task: "regenerate-hints"; word: VocabWord; instruction?: string });
+  | (Common & { task: "regenerate-hints"; word: VocabWord; instruction?: string })
+  /** Study-page Japanese for vocabulary that has none. Only the words listed are translated. */
+  | (Common & { task: "fill-japanese"; words: { word: string; partOfSpeech: string; meaning: string }[] });
 
 export type AiMode = "openai" | "mock";
 
@@ -26,7 +28,9 @@ export type StudioData =
       flagged?: { word: string; reason: string; hints: number[] }[];
     }
   | { task: "replace-word"; word: VocabWord }
-  | { task: "regenerate-hints"; hints: [string, string, string] };
+  | { task: "regenerate-hints"; hints: [string, string, string] }
+  /** Japanese meanings keyed by the normalised English word. Words the AI gave nothing for are absent. */
+  | { task: "fill-japanese"; ja: Record<string, string[]> };
 
 export type AiErrorCode = "bad_request" | "malformed" | "upstream" | "timeout" | "unsupported" | "validation";
 

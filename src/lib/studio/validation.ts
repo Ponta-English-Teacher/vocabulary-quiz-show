@@ -268,6 +268,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
   // Optional fields — sets saved before they existed simply don't have them. The AI may send them flat or nested.
   const giverInfo = coerceGiverInfo(r.giverInfo ?? { looks: r.looks, use: r.use, phrases: r.phrases });
   const ja = coerceJa(r.ja ?? r.japanese);
+  const studyJa = coerceJa(r.studyJa);
   const illustration = coerceIllustration(r.illustration);
   const askKind = coerceAskKind(r.askKind);
 
@@ -285,6 +286,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
       hints: hintsRaw.slice(0, 3),
       ...(giverInfo ? { giverInfo } : {}),
       ...(ja.length ? { ja } : {}),
+      ...(studyJa.length ? { studyJa } : {}),
       ...(askKind ? { askKind } : {}),
       ...(illustration ? { illustration } : {}),
     },

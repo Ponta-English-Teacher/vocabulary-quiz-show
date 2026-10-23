@@ -147,7 +147,9 @@ function lobbyAction(room: Room, words: VocabWord[] | null, seat: 0 | 1, action:
   if (action.type === "CONFIRM_ROLES") {
     // Only the partner of whoever proposed can confirm.
     if (!room.proposal || room.proposal.by === seat || !words) return false;
-    const started = gameReducer(createInitialState(), { type: "START", names: [room.seats[0].name, room.seats[1].name], words });
+    // Study-page translations are not game data: the game never holds them, so no screen can show or score them.
+    const gameWords = words.map(({ studyJa: _studyJa, ...rest }) => (void _studyJa, rest));
+    const started = gameReducer(createInitialState(), { type: "START", names: [room.seats[0].name, room.seats[1].name], words: gameWords });
     room.game = { ...started, giver: room.proposal.giverSeat };
     room.proposal = null;
     return true;

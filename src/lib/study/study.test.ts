@@ -175,13 +175,13 @@ describe("routes: students need no login, teachers do", () => {
 });
 
 describe("the student page", () => {
-  it("shows every word with definition, Japanese, example and pronunciation buttons — and nothing private", () => {
+  it("shows every word with definition, example and pronunciation buttons, Japanese hidden — and nothing private", () => {
     const words = LIST_A.map((w) => ({ word: w.word, partOfSpeech: w.partOfSpeech, meaning: w.meaning, ja: w.ja ?? [], example: w.example }));
     const html = renderToStaticMarkup(h(StudyList, { title: "Kitchen words", words }));
     for (const w of LIST_A) {
       expect(html).toContain(`>${w.word}<`);
       expect(html).toContain(w.meaning);
-      expect(html).toContain(`日本語-${w.word}`);
+      expect(html).not.toContain(`日本語-${w.word}`); // hidden until the student taps Show Japanese
       expect(html).toContain(w.example);
       expect(html).toContain(`Hear the word ${w.word}`); // the existing speech button
     }

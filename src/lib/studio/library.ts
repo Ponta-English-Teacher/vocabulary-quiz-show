@@ -37,7 +37,7 @@ export function libraryLists(activities: Activity[]): LibraryList[] {
         .map((s) => ({
           key: listKey(a.id, s.id), activityId: a.id, setId: s.id, title: `${a.title} — ${s.title.trim() || "Set"}`, count: s.words.length, words: s.words,
           ready: !s.missing?.length && s.words.length > 0, problems: approvalProblems(s),
-          missingJapanese: s.words.filter((w) => !(w.ja ?? []).some((j) => j.trim())).map((w) => w.word),
+          missingJapanese: s.words.filter((w) => ![...(w.ja ?? []), ...(w.studyJa ?? [])].some((j) => j.trim())).map((w) => w.word),
         })),
     );
 }

@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { VocabSet } from "@/data/vocab";
-import { fetchAiStatus } from "@/lib/studio/ai/client";
+import { callStudio, fetchAiStatus } from "@/lib/studio/ai/client";
+import { autoFillStudyJapanese } from "@/lib/studio/autoJapanese";
+import { EMPTY_BRIEF } from "@/lib/studio/types";
 import { activityFromSample, approvedSets, createActivity, toVocabSet } from "@/lib/studio/ops";
 import { deleteActivity, duplicateActivity, getBrowserStorage, loadActivities, saveActivity } from "@/lib/studio/storage";
 import type { Activity } from "@/lib/studio/types";
@@ -33,6 +35,16 @@ export function Studio({ onExit, onPlay }: { onExit: () => void; onPlay: (set: V
     refresh();
     fetchAiStatus().then((s) => setAi((prev) => ({ ...prev, mode: s.mode, model: s.model })));
   }, [refresh]);
+
+  // Existing approved vocabulary with no Japanese gets study translations automatically (once per visit, bounded; see autoJapanese.ts).
+  const filled = useRef(false);
+  useEffect(() => {
+    if (ai.mode !== "openai" || filled.current) return;
+    filled.current = true;
+    void autoFillStudyJapanese(getBrowserStorage(), async (words) => (await callStudio("fill-japanese", { brief: EMPTY_BRIEF, words })).data.ja).then((r) => {
+      if (r.filled > 0) refresh();
+    });
+  }, [ai.mode, refresh]);
 
   const open = (activity: Activity, setId?: string) => setView({ kind: "workshop", activity, key: Date.now(), setId });
 

@@ -154,6 +154,16 @@ export function saveActivity(storage: StorageLike | null, activity: Activity): W
   return write(storage, [saved, ...rest]);
 }
 
+/**
+ * Change saved activities in place WITHOUT touching their order, timestamps or approval: used by background repairs (such as filling
+ * in missing study translations) that must not look like a teacher edit. `mapper` returns the same object to leave one unchanged.
+ */
+export function rewriteActivities(storage: StorageLike | null, mapper: (a: Activity) => Activity): WriteResult {
+  const { activities } = loadActivities(storage);
+  const next = activities.map(mapper);
+  return next.some((a, i) => a !== activities[i]) ? write(storage, next) : { ok: true, activities };
+}
+
 export function duplicateActivity(storage: StorageLike | null, id: string): WriteResult & { copyId?: string } {
   const { activities } = loadActivities(storage);
   const src = activities.find((a) => a.id === id);

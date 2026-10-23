@@ -341,6 +341,7 @@ export function redactForTaker(state: GameState): GameState {
       // Same length, empty text: the Taker's phone can tell whether Japanese credit exists, never what the answers are.
       ja: (w.ja ?? []).map(() => ""),
       giverInfo: undefined,
+      studyJa: undefined,
       // Question ideas are chosen by the kind of word: a coarse label that says nothing about which word it is.
       askKind: resolveAskKind(w),
       // The Giver's private picture: never on the Taker's screen while the word is unsolved.

@@ -2,7 +2,7 @@ import type { GameState } from "@/lib/game";
 import { redactForTaker } from "@/lib/game";
 import type { SeatRole } from "./types";
 
-const BLANK = { word: "", accept: [] as string[], meaning: "", example: "", ja: [] as string[], giverInfo: undefined, illustration: undefined };
+const BLANK = { word: "", accept: [] as string[], meaning: "", example: "", ja: [] as string[], studyJa: undefined, giverInfo: undefined, illustration: undefined };
 
 /**
  * The Giver may see ONLY the word currently in play (and words already solved/skipped).
@@ -14,7 +14,7 @@ export function redactForGiver(state: GameState): GameState {
   const words = state.words.map((w) => {
     const pending = state.statuses[w.id] === "pending";
     const inPlay = state.phase === "round" && w.id === state.currentWordId;
-    if (inPlay) return { ...w, ja: [], illustration: undefined };
+    if (inPlay) return { ...w, ja: [], studyJa: undefined, illustration: undefined };
     if (!pending) return w;
     return { ...w, ...BLANK, hints: w.hints.map(() => "") };
   });

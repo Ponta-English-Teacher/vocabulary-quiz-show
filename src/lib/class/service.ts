@@ -2,11 +2,14 @@ import { randomBytes } from "node:crypto";
 import { coerceWord } from "@/lib/studio/validation";
 import type { Illustration, VocabWord } from "@/data/vocab";
 import { generateIllustration, IllustrateError } from "@/lib/studio/illustration";
+import { translateJapanese } from "@/lib/studio/ai/japanese";
+import { DEFAULT_MODEL } from "@/lib/studio/ai/openai";
 import type { ClassView } from "./types";
 import {
   applyAction, buildView, claimSeat, cleanName, cloneRoom, fail, hashToken, markIllustration, newRoom, normalizeGroup, other, parseAction,
   seatFor, type ClassActivity, type Fail, type Room,
 } from "./engine";
+import { normalize } from "@/lib/answer";
 import { toStudyWord } from "@/lib/study/service";
 import type { StudyWord } from "@/lib/study/types";
 import { KvConfigError, KvError, kvFromEnv, versionOf, type KV } from "./kv";
@@ -47,6 +50,16 @@ export const MAX_DRAWS_PER_ACTIVITY = 40;
 const wordTriesKey = (activityId: string, wordId: string) => `vqs:imgtries:${activityId}:${wordId}`;
 const activityTriesKey = (activityId: string) => `vqs:imgtries:${activityId}`;
 const LOCK_TTL = 150; // seconds; longer than the image call can take, so a crashed request can't block a word for long
+// Study translations for an activity whose words carry no Japanese (older sessions). Kept apart from the activity snapshot,
+// which is never modified after it is created, so no active game and no score can be affected.
+const studyJaKey = (activityId: string) => `vqs:studyja:${activityId}`;
+const studyJaLockKey = (activityId: string) => `vqs:studyjalock:${activityId}`;
+const studyJaCoolKey = (activityId: string) => `vqs:studyjacool:${activityId}`;
+const studyJaTriesKey = (activityId: string) => `vqs:studyjatries:${activityId}`;
+/** At most this many paid translation attempts per class activity, ever, and no two within the cool-down. */
+export const MAX_STUDY_TRANSLATE_TRIES = 3;
+export const STUDY_TRANSLATE_COOLDOWN = 10 * 60;
+const STUDY_TRANSLATE_LOCK = 60;
 const presKey = (activityId: string, group: string, seat: 0 | 1) => `vqs:pres:${activityId}:${group}:${seat}`;
 
 const serialize = (r: Room) => `${r.version}|${JSON.stringify(r)}`;
@@ -75,8 +88,12 @@ function pictureFailureText(e: unknown): string {
 /** Draws ONE picture for one word (a paid call). Injected so tests use a fake; production uses the OpenAI image API. */
 export type Drawer = (word: VocabWord) => Promise<Illustration>;
 
+/** Japanese for study cards: one request for the given words. Injected so tests use a fake; production uses the existing OpenAI setup. */
+export type StudyTranslator = (words: { word: string; partOfSpeech: string; meaning: string }[]) => Promise<Record<string, string[]>>;
+
 export interface ClassServiceOptions {
   drawer?: Drawer;
+  translator?: StudyTranslator;
   /** How long a request waits for another request's picture of the same word before giving up (ms). */
   lockWaitMs?: number;
   sleep?: (ms: number) => Promise<void>;
@@ -157,7 +174,7 @@ export class ClassService {
    * final result it is open. (Someone who has not joined cannot be told apart from anyone else, so this guard protects
    * the app's own screens; it cannot stop a determined student opening the link in a second browser.)
    */
-  async getStudy(input: { activityId: string; group?: unknown; token?: unknown }): Promise<{ ok: true; title: string; words: StudyWord[] } | Fail> {
+  async getStudy(input: { activityId: string; group?: unknown; token?: unknown }): Promise<{ ok: true; title: string; words: StudyWord[]; translating: boolean } | Fail> {
     return (await this.guard(async () => {
       const activity = await this.loadActivity(input.activityId);
       if (!activity) return fail("no_activity", NO_ACTIVITY);
@@ -168,8 +185,58 @@ export class ClassService {
           return fail("forbidden", "Study Vocabulary opens again when your game ends.");
         }
       }
-      return { ok: true as const, title: activity.title, words: activity.words.map(toStudyWord) };
-    })) as { ok: true; title: string; words: StudyWord[] } | Fail;
+      const extra = await this.studyTranslations(activity);
+      return {
+        ok: true as const,
+        title: activity.title,
+        words: activity.words.map((w) => toStudyWord({ ...w, studyJa: w.studyJa?.length ? w.studyJa : (w.ja ?? []).some((j) => j.trim()) ? undefined : extra.table[normalize(w.word)] })),
+        translating: extra.translating,
+      };
+    })) as { ok: true; title: string; words: StudyWord[]; translating: boolean } | Fail;
+  }
+
+  /**
+   * Words of an older class snapshot with no Japanese get study translations on the FIRST study visit, then they are cached for
+   * the life of the activity: later visits cost nothing. Bounded: one request at a time (a lock), a cool-down between tries and
+   * MAX_STUDY_TRANSLATE_TRIES in total. Only words with no Japanese at all are asked about; the snapshot itself is never changed.
+   */
+  private async studyTranslations(activity: ClassActivity): Promise<{ table: Record<string, string[]>; translating: boolean }> {
+    const lacking = activity.words.filter((w) => !(w.ja ?? []).some((j) => j.trim()) && !(w.studyJa ?? []).some((j) => j.trim()));
+    if (!lacking.length) return { table: {}, translating: false };
+    const read = async (): Promise<Record<string, string[]>> => {
+      try {
+        const raw = await this.kv.get(studyJaKey(activity.id));
+        const j = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
+        return j && typeof j === "object" ? j : {};
+      } catch {
+        return {};
+      }
+    };
+    let table = await read();
+    let still = lacking.filter((w) => !table[normalize(w.word)]?.length);
+    if (!still.length || !this.opts.translator) return { table, translating: false };
+    if (await this.kv.get(studyJaCoolKey(activity.id))) return { table, translating: false };
+    if ((Number(await this.kv.get(studyJaTriesKey(activity.id))) || 0) >= MAX_STUDY_TRANSLATE_TRIES) return { table, translating: false };
+    // One visitor translates; anyone arriving meanwhile is told it is being prepared and simply looks again in a moment.
+    if (!(await this.kv.cas(studyJaLockKey(activity.id), 0, "1|x", STUDY_TRANSLATE_LOCK))) return { table, translating: true };
+    try {
+      await this.kv.incr(studyJaTriesKey(activity.id), ACTIVITY_TTL);
+      table = await read(); // someone may have finished just before we took the lock
+      still = lacking.filter((w) => !table[normalize(w.word)]?.length);
+      if (still.length) {
+        try {
+          const got = await this.opts.translator(still.map((w) => ({ word: w.word, partOfSpeech: w.partOfSpeech, meaning: w.meaning })));
+          table = { ...table, ...got };
+          await this.kv.set(studyJaKey(activity.id), JSON.stringify(table), ACTIVITY_TTL);
+        } catch {
+          /* no translation this time: the page shows "not added yet" */
+        }
+        if (still.some((w) => !table[normalize(w.word)]?.length)) await this.kv.set(studyJaCoolKey(activity.id), "1", STUDY_TRANSLATE_COOLDOWN);
+      }
+    } finally {
+      await this.kv.set(studyJaLockKey(activity.id), "x", 1);
+    }
+    return { table, translating: false };
   }
 
   /**
@@ -401,8 +468,15 @@ export class ClassService {
 
 const G = globalThis as unknown as { __vqsClassService?: ClassService };
 export function getClassService(): ClassService {
-  return (G.__vqsClassService ??= new ClassService(() => kvFromEnv(), Date.now, { drawer: envDrawer }));
+  return (G.__vqsClassService ??= new ClassService(() => kvFromEnv(), Date.now, { drawer: envDrawer, translator: envTranslator }));
 }
+
+/** Production translator: the existing OpenAI setup, read from the server environment at call time. Absent key → no translation (and no cost). */
+const envTranslator: StudyTranslator | undefined = (words) => {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return Promise.resolve({});
+  return translateJapanese({ apiKey, model: process.env.OPENAI_MODEL || DEFAULT_MODEL }, words);
+};
 
 /** Production drawer: the existing OpenAI image setup, read from the server environment at call time (never sent anywhere else). */
 const envDrawer: Drawer = async (word) => {

@@ -49,6 +49,7 @@ export function WordRow(p: WordRowProps) {
   const [instr, setInstr] = useState("");
   const [acceptText, setAcceptText] = useState((w.accept ?? []).join(", "));
   const [jaText, setJaText] = useState((w.ja ?? []).join("、"));
+  const [studyJaText, setStudyJaText] = useState((w.studyJa ?? []).join("、"));
   const [phraseText, setPhraseText] = useState((w.giverInfo?.phrases ?? []).join("\n"));
   const panelId = `word-${w.id}`;
 
@@ -191,7 +192,7 @@ export function WordRow(p: WordRowProps) {
           <fieldset className="hintset">
             <legend>Japanese answers — for “I know it, but not in English!”</legend>
             <label className="fld fld--ja">
-              <span>Approved Japanese equivalents <small>(comma-separated; at most {LIMITS.ja}; also shown to students on the Study Page)</small></span>
+              <span>Approved Japanese equivalents <small>(comma-separated; at most {LIMITS.ja}; shown on the Study Page too unless you set a study meaning below)</small></span>
               <input
                 key={`${w.id}:${(w.ja ?? []).join("|")}`}
                 lang="ja"
@@ -207,6 +208,19 @@ export function WordRow(p: WordRowProps) {
               A Japanese answer earns <b>half</b> the points <b>only if it matches one of these</b>. Matching is exact: hiragana/katakana, spaces and punctuation are ignored, but kanji spellings and synonyms must be listed here. Students never see this list before answering. AI suggestions are drafts — please check them. Leave empty to give no Japanese credit.
             </p>
             <Problems issues={fieldIssues(issues, "ja")} />
+            <label className="fld fld--ja">
+              <span>Study Page meaning <small>(shown to students only after they tap Show Japanese; never used for scoring)</small></span>
+              <input
+                key={`${w.id}:study:${(w.studyJa ?? []).join("|")}`}
+                lang="ja"
+                value={studyJaText}
+                onChange={(e) => setStudyJaText(e.target.value)}
+                onBlur={() => p.onEdit({ studyJa: coerceJa(studyJaText) })}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); p.onEdit({ studyJa: coerceJa(studyJaText) }); } }}
+                placeholder="Filled in automatically when a word has no Japanese; you can correct it here"
+                disabled={p.disabled}
+              />
+            </label>
           </fieldset>
 
           <label className="fld">
