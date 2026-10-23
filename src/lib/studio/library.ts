@@ -19,6 +19,8 @@ export interface LibraryList {
   words: VocabWord[];
   /** False when the set is still missing words: it is shown (so it can be fixed or deleted) but cannot be hosted. */
   ready: boolean;
+  /** Words with no Japanese meaning yet (shown on the student Study Page as "not added yet"). */
+  missingJapanese: string[];
   /** Anything that needs the teacher's attention. Never hides a list. */
   problems: string[];
 }
@@ -35,6 +37,7 @@ export function libraryLists(activities: Activity[]): LibraryList[] {
         .map((s) => ({
           key: listKey(a.id, s.id), activityId: a.id, setId: s.id, title: `${a.title} — ${s.title.trim() || "Set"}`, count: s.words.length, words: s.words,
           ready: !s.missing?.length && s.words.length > 0, problems: approvalProblems(s),
+          missingJapanese: s.words.filter((w) => !(w.ja ?? []).some((j) => j.trim())).map((w) => w.word),
         })),
     );
 }

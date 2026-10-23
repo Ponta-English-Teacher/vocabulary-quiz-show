@@ -189,10 +189,10 @@ describe("the student page", () => {
     expect(html).not.toMatch(/PRIVATE|hint/i);
     expect(html).not.toMatch(/<input|<textarea|Lock it in|score/i); // a study resource, not a game
   });
-  it("a word without Japanese shows a dash, and one word reads '1 word'", () => {
+  it("a word without Japanese says so plainly, and one word reads '1 word'", () => {
     const html = renderToStaticMarkup(h(StudyList, { title: "T", words: [{ word: "towel", partOfSpeech: "noun", meaning: "m", ja: [], example: "" }] }));
     expect(html).toContain("1 word");
-    expect(html).toContain("<em>—</em>");
+    expect(html).toContain("Japanese not added yet");
   });
 });
 

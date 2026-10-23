@@ -1,13 +1,13 @@
 import type { VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
-import { hintProblems, parseGeneratedWords } from "../validation";
+import { coerceJa, hintProblems, parseGeneratedWords } from "../validation";
 import { restrictionsFor, withRestrictionNote } from "../restrictions";
 import { mockApproved, mockChat, mockGenerate, mockHints, mockReplace } from "./mock";
 import { callOpenAIJson, DEFAULT_MODEL, type FetchLike } from "./openai";
 import { mergeAiCandidates } from "../candidates";
 import type { Brief, ChatResult } from "../types";
 import { APPROVAL_RE, DISCUSS_FIRST_RE, enforceApproval, enforceMixture, parseChatResult, parseHints, parseStudioRequest } from "./parse";
-import { approvedPrompt, chatPrompt, generatePrompt, hintsPrompt, replacePrompt } from "./prompts";
+import { approvedPrompt, chatPrompt, generatePrompt, hintsPrompt, japanesePrompt, replacePrompt } from "./prompts";
 import { AiError, type AiMode, type StudioData, type StudioRequest, type StudioResponse } from "./types";
 
 /** At most this many calls to fill ONE set (cost cap), asking a few extra items each time. */
@@ -23,6 +23,8 @@ export interface ServiceDeps {
   model?: string;
   fetchImpl?: FetchLike;
   rng?: () => number;
+  /** After writing new items, ask once more for the Japanese of any item that came back without one. On in production (see the route). */
+  fillJapanese?: boolean;
 }
 
 export function resolveMode(deps: ServiceDeps, forceMock = false): AiMode {
@@ -195,6 +197,7 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
         issues.push(...free.issues);
       }
       if (found.length === 0) throw new AiError("malformed", "The AI did not return any usable vocabulary. Nothing was changed.");
+      if (deps.fillJapanese) await fillJapanese(cfg, found, issues);
       return { task: "generate", words: found, issues, requested: req.count, ...(failed.length ? { failed } : {}), ...(flagged.length ? { flagged } : {}) };
     }
 
@@ -203,7 +206,10 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
         const raw = await callOpenAIJson(cfg, replacePrompt(req.brief, req.current, req.exclude, req.instruction));
         const exclude = [...req.exclude, req.current.word];
         const parsed = parseGeneratedWords([(raw as { word?: unknown })?.word], { exclude, max: 1, topic: req.brief.topic, wordType: req.brief.wordType, restrictions });
-        if (parsed.words[0]) return { task: "replace-word", word: parsed.words[0] };
+        if (parsed.words[0]) {
+          if (deps.fillJapanese) await fillJapanese(cfg, [parsed.words[0]], []);
+          return { task: "replace-word", word: parsed.words[0] };
+        }
       }
       throw new AiError("malformed", "The AI could not produce a valid replacement. The original word was kept.");
     }
@@ -225,6 +231,29 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
       throw last ?? new AiError("malformed", "Could not produce valid hints.");
     }
   }
+}
+
+/**
+ * New AI items that came back without any Japanese equivalent get ONE small follow-up request (all such words together).
+ * Only items just written by the AI are touched: saved or approved vocabulary is never filled in behind the teacher's back,
+ * and a failure here is not an error (the word simply stays marked "no Japanese yet" for the teacher to add by hand).
+ */
+async function fillJapanese(cfg: { apiKey: string; model: string; fetchImpl?: FetchLike }, words: VocabWord[], issues: string[]): Promise<void> {
+  const need = words.filter((w) => !(w.ja ?? []).some((j) => j.trim()));
+  if (!need.length) return;
+  try {
+    const raw = (await callOpenAIJson(cfg, japanesePrompt(need))) as { ja?: Record<string, unknown> };
+    const table = raw && typeof raw.ja === "object" && raw.ja ? raw.ja : {};
+    const byWord = new Map(Object.entries(table).map(([k, v]) => [normalize(k), v]));
+    for (const w of need) {
+      const list = coerceJa(byWord.get(normalize(w.word)));
+      if (list.length) w.ja = list;
+    }
+  } catch {
+    /* keep the words as written */
+  }
+  const still = need.filter((w) => !(w.ja ?? []).length).map((w) => w.word);
+  if (still.length) issues.push(`No Japanese meaning was written for: ${still.join(", ")}. You can add it in the word's Japanese field.`);
 }
 
 function uniqueWords(list: string[]): string[] {

@@ -29,6 +29,7 @@ export async function POST(request: Request) {
   const { status, body: result } = await handleStudioRequest(body, {
     apiKey: process.env.OPENAI_API_KEY,
     model: process.env.OPENAI_MODEL,
+    fillJapanese: true,
   });
   return Response.json(result, { status });
 }

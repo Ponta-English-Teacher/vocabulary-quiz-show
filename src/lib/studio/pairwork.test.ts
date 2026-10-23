@@ -108,12 +108,13 @@ describe("AI generation instructions (no per-round AI call is involved)", () => 
     expect(r).toMatch(/EASIER than the target word/);
     expect(r).toMatch(/Do not use the target word/);
   });
-  it("asks for approved Japanese equivalents, never merely related words, and allows an empty list", () => {
+  it("asks for approved Japanese equivalents on every item, never merely related words", () => {
     const r = system();
     expect(r).toMatch(/"ja": 1 to 6 approved JAPANESE EQUIVALENTS/);
     expect(r).toMatch(/\["ざる", "水切りざる"/);
     expect(r).toMatch(/never merely related words/);
-    expect(r).toMatch(/return an empty array rather than guessing/);
+    expect(r).toMatch(/EVERY item needs this field/);
+    expect(r).toMatch(/Use an empty array ONLY when the target truly has no Japanese equivalent/);
   });
   it("the item shape includes the new fields", () => {
     expect(JSON.stringify(generatePrompt(EMPTY_BRIEF, 3, []))).toContain('\\"ja\\": string[]');

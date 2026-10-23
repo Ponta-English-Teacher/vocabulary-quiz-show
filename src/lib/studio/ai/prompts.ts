@@ -59,7 +59,7 @@ ITEM RULES
     "phrases" = 2 to 4 very short sentence starters the Giver can use, e.g. ["It looks like...", "You use it when...", "It has...", "You put ... inside."]; for actions or feelings use starters such as "You do this when...", "It is a feeling...".
   Write them in plain, speakable English that is clearly EASIER than the target word (short sentences, everyday words, no rare vocabulary). Do not use the target word or its inflections in them (the Giver may not say it). Each line at most 25 words.
 - "askKind": the kind of word, which decides the question ideas the Taker sees. EXACTLY one of: "object" (a thing you can see or touch), "action" (something people do), "feeling" (a feeling or attitude, e.g. reluctant), "quality" (a physical or descriptive adjective, e.g. wooden), "concept" (an abstract idea), "expression" (a phrase people say), "manner" (an adverb of how/when/where). Judge by meaning, not only part of speech.
-- "ja": 1 to 6 approved JAPANESE EQUIVALENTS of the target, written as a Japanese student would answer: the everyday translation first, then common synonyms and the other common writings (kanji, hiragana). Example: "colander" → ["ざる", "水切りざる", "ストレーナー"]. Include ONLY words that genuinely mean the same thing — never merely related words (for "colander", not "鍋" or "料理"). These are matched exactly, with no fuzzy guessing, and the teacher will review them. If you are not confident of a correct Japanese equivalent, return an empty array rather than guessing.
+- "ja": 1 to 6 approved JAPANESE EQUIVALENTS of the target, written as a Japanese student would answer: the everyday translation first, then common synonyms and the other common writings (kanji, hiragana). Example: "colander" → ["ざる", "水切りざる", "ストレーナー"]. Include ONLY words that genuinely mean the same thing — never merely related words (for "colander", not "鍋" or "料理"). These are matched exactly, with no fuzzy guessing, and the teacher will review them. EVERY item needs this field, because it is also what students study: give the ordinary Japanese word for the target (for example "desk" → ["机", "デスク"], "blackboard" → ["黒板"]). Use an empty array ONLY when the target truly has no Japanese equivalent — never merely because you are unsure whether to include it.
 - "accept": alternative answers to accept (plurals, spelling variants, common inflections, short variants of a phrase). Empty array if none.
 - Vary the words; no duplicates; never repeat anything in the "avoid" list.
 - Ten is the size of one quiz set, not the size of the topic. Choose words that fit the teacher's scope and balance and that work well for interactive communication, not just the most obvious ten.
@@ -145,6 +145,17 @@ export function hintsPrompt(brief: Brief, word: VocabWord, instruction?: string)
       role: "user" as const,
       content: `Write three NEW progressive hints for the target word "${word.word}" (${word.partOfSpeech}, ${word.cefr}). Meaning: ${word.meaning}\nAccepted alternatives (also forbidden in hints): ${JSON.stringify(word.accept ?? [])}\nThe old hints were (write different ones): ${JSON.stringify(word.hints)}\nBRIEF (the teacher's wishes about level, learners and hints apply): ${briefText(brief)}\n${instruction ? `Teacher's instruction (latest; it overrides the brief if they differ): ${instruction}\n` : ""}`,
     },
+  ];
+}
+
+/** A small request for the Japanese equivalents of items the AI wrote without any. Only used for NEW items; existing vocabulary is never filled in. */
+export function japanesePrompt(words: { word: string; partOfSpeech: string; meaning: string }[]) {
+  return [
+    {
+      role: "system" as const,
+      content: `You give Japanese equivalents of English vocabulary for Japanese students. For each word return 1 to 4 Japanese words or short phrases that genuinely mean the same thing, written as a Japanese student would answer: the everyday translation first, then common synonyms or other common writings (kanji, katakana). Never include merely related words. Return JSON only: {"ja": {"<english word exactly as given>": ["...", "..."]}}.`,
+    },
+    { role: "user" as const, content: `Words: ${JSON.stringify(words.map((w) => ({ word: w.word, partOfSpeech: w.partOfSpeech, meaning: w.meaning })))}` },
   ];
 }
 

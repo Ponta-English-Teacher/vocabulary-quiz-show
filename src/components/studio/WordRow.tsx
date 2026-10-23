@@ -191,7 +191,7 @@ export function WordRow(p: WordRowProps) {
           <fieldset className="hintset">
             <legend>Japanese answers — for “I know it, but not in English!”</legend>
             <label className="fld fld--ja">
-              <span>Approved Japanese equivalents <small>(comma-separated; at most {LIMITS.ja})</small></span>
+              <span>Approved Japanese equivalents <small>(comma-separated; at most {LIMITS.ja}; also shown to students on the Study Page)</small></span>
               <input
                 key={`${w.id}:${(w.ja ?? []).join("|")}`}
                 lang="ja"

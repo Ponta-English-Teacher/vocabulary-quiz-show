@@ -67,6 +67,9 @@ export function StudioHome({
                 <div className="lineup__main">
                   <h3 className="lineup__title">{l.title}</h3>
                   <p className="lineup__meta">{l.count} word{l.count === 1 ? "" : "s"} · {l.words.map((w) => w.word).join(", ")}</p>
+                  {l.missingJapanese.length ? (
+                    <p className="note">No Japanese meaning yet for: {l.missingJapanese.join(", ")}. Students see “Japanese not added yet”. To add it: Edit → open the word → Japanese answers (reopen the set first if it is approved).</p>
+                  ) : null}
                   {l.problems.length ? <p className="note">Needs attention before hosting: {l.problems[0]}</p> : null}
                 </div>
                 <div className="lineup__actions">
