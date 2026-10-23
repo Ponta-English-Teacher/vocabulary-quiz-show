@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ASK_KINDS, ASK_KIND_LABELS, coerceAskKind, resolveAskKind } from "@/lib/askQuestions";
 import { CEFR_LEVELS, PARTS_OF_SPEECH, type VocabWord } from "@/data/vocab";
+import type { Restriction } from "@/lib/studio/restrictions";
 import { coerceJa, LIMITS, validateWord, type WordIssue } from "@/lib/studio/validation";
 
 export interface WordRowProps {
@@ -11,6 +12,8 @@ export interface WordRowProps {
   locked: boolean;
   open: boolean;
   disabled: boolean;
+  /** The teacher's checkable hint restrictions; a hint that breaks one is warned about right at the field. */
+  restrictions?: Restriction[];
   busyWordId: string | null;
   onToggleOpen: () => void;
   onEdit: (patch: Partial<Omit<VocabWord, "id">>) => void;
@@ -40,7 +43,7 @@ function Problems({ issues }: { issues: WordIssue[] }) {
 
 export function WordRow(p: WordRowProps) {
   const { word: w } = p;
-  const issues = validateWord(w);
+  const issues = validateWord(w, p.restrictions);
   const errors = issues.filter((i) => i.severity === "error").length;
   const working = p.busyWordId === w.id;
   const [instr, setInstr] = useState("");
@@ -121,7 +124,7 @@ export function WordRow(p: WordRowProps) {
 
           <fieldset className="hintset">
             <legend>Hints — hint 1 is the free opening hint</legend>
-            <p className="note">Hint 1 is shown to <b>the Giver only, automatically</b> at the start of every round (the Taker never sees it) and costs nothing, so make it a real situation (who, when, where) — not just “it is a kitchen tool”. Hints 2 and 3 are optional and cost points.</p>
+            <p className="note">Hint 1 is shown to <b>the Giver only, automatically</b> at the start of every round (the Taker never sees it) and costs nothing, so make it a real situation (who, when, where) — not just “it is a kitchen tool”. Hints 2 and 3 are optional and cost points. Hints you type yourself are never overwritten by the AI; clear a hint to let the AI write it again.</p>
             {[0, 1, 2].map((i) => (
               <label className="fld fld--hint" key={i}>
                 <span className="hintset__n">{i + 1}</span>

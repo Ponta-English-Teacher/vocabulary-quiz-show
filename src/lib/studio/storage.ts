@@ -81,6 +81,16 @@ export function parseActivity(raw: unknown): Activity | null {
           : [];
         return missing.length ? { missing } : {};
       })(),
+      ...(() => {
+        const ids = new Set(words.map((w) => w.id));
+        const raw = isObj(s.handHints) ? (s.handHints as Record<string, unknown>) : {};
+        const hand: Record<string, number[]> = {};
+        for (const [id, v] of Object.entries(raw)) {
+          const idx = Array.isArray(v) ? [...new Set(v.filter((n): n is number => n === 0 || n === 1 || n === 2))].sort() : [];
+          if (ids.has(id) && idx.length) hand[id] = idx;
+        }
+        return Object.keys(hand).length ? { handHints: hand } : {};
+      })(),
       lockedIds: Array.isArray(s.lockedIds) ? s.lockedIds.filter((x): x is string => typeof x === "string") : [],
     });
   }
@@ -162,6 +172,7 @@ export function duplicateActivity(storage: StorageLike | null, id: string): Writ
         id: newId("s"),
         words: s.words.map((w) => ({ ...w, id: idMap.get(w.id)! })),
         lockedIds: s.lockedIds.map((x) => idMap.get(x)).filter((x): x is string => !!x),
+        ...(s.handHints ? { handHints: Object.fromEntries(Object.entries(s.handHints).flatMap(([id, v]) => (idMap.has(id) ? [[idMap.get(id)!, v]] : []))) } : {}),
       };
     }),
   };

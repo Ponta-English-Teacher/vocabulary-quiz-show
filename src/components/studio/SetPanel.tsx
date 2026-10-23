@@ -47,7 +47,7 @@ export function SetPanel({
   onEdit: (setId: string, wordId: string, patch: Partial<Omit<VocabWord, "id">>) => void;
   onToggleLock: (setId: string, wordId: string) => void;
   onReplace: (setId: string, wordId: string, instruction: string) => void;
-  onNewHints: (setId: string, wordId: string, instruction: string) => void;
+  onNewHints: (setId: string, wordId: string, instruction: string, only?: number[]) => void;
   onIllustrate: (setId: string, wordId: string) => void;
   onIllustrateAll: (setId: string) => void;
   onRemoveIllustration: (setId: string, wordId: string) => void;
@@ -110,7 +110,7 @@ export function SetPanel({
                 {hintWords.map(({ word, hints, reasons }) => (
                   <p key={word.id} className="progress__miss">
                     <b>“{word.word}”</b> — {hints.length ? `hint${hints.length === 1 ? "" : "s"} ${hints.map((h) => h + 1).join(", ")} need${hints.length === 1 ? "s" : ""} attention` : "its hints need attention"}: {reasons.join(" ")}{" "}
-                    <button type="button" className="btn btn--small" disabled={disabled || !canGenerate} onClick={() => onNewHints(set.id, word.id, "")}>Rewrite hints</button>{" "}
+                    <button type="button" className="btn btn--small" disabled={disabled || !canGenerate} onClick={() => onNewHints(set.id, word.id, "", hints.length ? hints : undefined)} title="Rewrites only the hints that have a problem; hints you wrote yourself are kept">Rewrite hints</button>{" "}
                     <button type="button" className="btn btn--small btn--ghost" disabled={disabled} onClick={() => setOpenId(word.id)}>Edit hints myself</button>
                   </p>
                 ))}
@@ -161,6 +161,7 @@ export function SetPanel({
                 locked={set.lockedIds.includes(w.id)}
                 open={openId === w.id}
                 disabled={disabled}
+                restrictions={restrictions}
                 busyWordId={busyWordId}
                 onToggleOpen={() => setOpenId(openId === w.id ? null : w.id)}
                 onEdit={(patch) => onEdit(set.id, w.id, patch)}

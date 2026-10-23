@@ -175,3 +175,18 @@ describe("approval is blocked until restriction violations are resolved", () => 
     expect(setProgress(a.sets[0], restrictionsFor("")).needCorrection).toBe(0);
   });
 });
+
+describe("real model output from the Studio run (recorded)", () => {
+  const r = parseRestrictions([NO_CAL]);
+  const REAL: Record<string, string[]> = {
+    Wednesday: ["Imagine you are halfway through your school week, and you look forward to the weekend ahead.", "Many students feel this day is important because it means they have done half of their classes for the week.", "People often say 'hump day' for this day."],
+    Friday: ["This day is often celebrated because it leads to the weekend.", "People often go out with friends, or they might watch movies at home on this day.", "Many people finish work or school activities on this day."],
+    Monday: ["Imagine a time when the weekend is over, and you have to get back to your job or classes.", "Many people say they feel tired or unhappy on this day because it means work starts again.", "It is often the day people complain about because of work or school starting again."],
+  };
+  it("flags the halfway / weekend-over / leads-to-the-weekend clues in hint 1, and leaves clean hints alone", () => {
+    expect(restrictionProblems(REAL.Wednesday, r).map((p) => p.hintIndex)).toEqual([0]); // hint 2 ("half of their classes for the week") is too far from "week" to be caught: a known miss
+    expect(restrictionProblems(REAL.Friday, r).map((p) => p.hintIndex)).toEqual([0]);
+    expect(restrictionProblems(REAL.Monday, r).map((p) => p.hintIndex)).toEqual([0]);
+    expect(restrictionProblems(["Many people have their classes or work this day.", "It is often seen as a day to be productive, especially in offices.", "x"], r)).toEqual([]);
+  });
+});

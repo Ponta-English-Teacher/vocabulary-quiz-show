@@ -1,7 +1,7 @@
 import type { VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
 import { hintProblems, parseGeneratedWords } from "../validation";
-import { restrictionsFor, type Restriction } from "../restrictions";
+import { restrictionsFor, withRestrictionNote } from "../restrictions";
 import { mockApproved, mockChat, mockGenerate, mockHints, mockReplace } from "./mock";
 import { callOpenAIJson, DEFAULT_MODEL, type FetchLike } from "./openai";
 import { mergeAiCandidates } from "../candidates";
@@ -47,6 +47,11 @@ export async function handleStudioRequest(body: unknown, deps: ServiceDeps): Pro
     const req = parseStudioRequest(body);
     mode = resolveMode(deps, req.forceMock);
     const data = mode === "mock" ? runMock(req, deps) : await runOpenAI(req, deps);
+    // The teacher's checkable hint restrictions go into the brief by code, not by the model's goodwill: the model often forgets them.
+    if (req.task === "chat" && data.task === "chat") {
+      const last = req.messages[req.messages.length - 1].text;
+      data.result.brief.learnerFocus = withRestrictionNote(data.result.brief.learnerFocus, req.brief.learnerFocus, last);
+    }
     return { status: 200, body: { ok: true, mode, model: mode === "openai" ? deps.model || DEFAULT_MODEL : undefined, data } };
   } catch (err) {
     const e = err instanceof AiError ? err : new AiError("upstream", "Unexpected error while talking to the AI.");

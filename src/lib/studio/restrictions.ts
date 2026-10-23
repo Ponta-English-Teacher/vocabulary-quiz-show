@@ -55,11 +55,26 @@ function hintNumbers(s: string): number[] {
   return [...out].sort();
 }
 
+const sentencesOf = (notes: (string | undefined)[]) => notes.filter((n): n is string => !!n && !!n.trim()).flatMap((n) => n.split(/(?<=[.!?。])\s+|\n+/)).map((x) => x.trim()).filter(Boolean);
+
+/** The sentences of a teacher message that state a checkable restriction (including a follow-up such as "Such clues are permitted in Hint 3."). */
+export function restrictionSentences(text: string | undefined): string[] {
+  let last: boolean = false;
+  const out: string[] = [];
+  for (const s of sentencesOf([text])) {
+    const named = (Object.keys(KEYWORDS) as RestrictionKind[]).some((k) => KEYWORDS[k].test(s));
+    const follows: boolean = !named && last && /\b(?:such|these|those|them|they|it|that)\b/i.test(s);
+    last = named || follows;
+    if (last) out.push(s);
+  }
+  return out;
+}
+
 /** Read restrictions from teacher notes given oldest → newest. Later sentences override earlier ones. */
 export function parseRestrictions(notes: (string | undefined)[]): Restriction[] {
   const state = new Map<RestrictionKind, Set<number>>();
   let last: RestrictionKind[] = [];
-  const sentences = notes.filter((n): n is string => !!n && !!n.trim()).flatMap((n) => n.split(/(?<=[.!?。])\s+|\n+/));
+  const sentences = sentencesOf(notes);
   for (const raw of sentences) {
     const s = raw.trim();
     if (!s) continue;
@@ -103,7 +118,7 @@ export const restrictionsFor = (learnerFocus: string | undefined, instruction?: 
 const DAYS = "monday|tuesday|wednesday|thursday|friday|saturday|sunday";
 const MONTHS = "january|february|march|april|june|july|august|september|october|november|december";
 const CALENDAR_TERM = new RegExp(`^(?:${DAYS}|${MONTHS}|weeks?|weekends?|weekdays?)$`);
-const SEQUENCE_CUE = /^(?:before|after|next|previous|following|between|middle|first|second|third|fourth|fifth|sixth|seventh|last|start|beginning|end|early|late|near|close|then|since|until)$/;
+const SEQUENCE_CUE = /^(?:before|after|next|previous|following|between|middle|first|second|third|fourth|fifth|sixth|seventh|last|starts?|started|starting|begin|begins|beginning|ends?|ended|ending|early|late|near|close|then|since|until|halfway|half|mid|midweek|over|leads?|leading|toward|towards)$/;
 
 function calendarClue(hint: string): string | null {
   const tokens = hint.toLowerCase().replace(/['’]s\b/g, "").replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
@@ -141,10 +156,14 @@ export function restrictionProblems(hints: readonly string[], restrictions: read
   return out.sort((a, b) => a.hintIndex - b.hintIndex);
 }
 
-/** Keep a one-off instruction that contains a checkable restriction, so it is still enforced later. Newest text is last and wins. */
-export function withRestrictionNote(learnerFocus: string, instruction?: string): string {
-  if (!instruction || !parseRestrictions([instruction]).length) return learnerFocus;
-  if (learnerFocus.includes(instruction.trim())) return learnerFocus;
-  const joined = `${learnerFocus.trim()} ${instruction.trim()}`.trim();
-  return joined.length > 500 ? joined.slice(joined.length - 500) : joined;
+/**
+ * Keep the restriction sentences of a teacher message in the brief notes, so they are still enforced later. Only checkable
+ * restriction sentences are kept (never the rest of the message); newest text is last, so it wins. At most 500 characters.
+ */
+export function withRestrictionNote(learnerFocus: string, ...messages: (string | undefined)[]): string {
+  let focus = learnerFocus.trim();
+  for (const m of messages) {
+    for (const sentence of restrictionSentences(m)) if (!focus.includes(sentence)) focus = `${focus} ${sentence}`.trim();
+  }
+  return focus.length > 500 ? focus.slice(focus.length - 500) : focus;
 }

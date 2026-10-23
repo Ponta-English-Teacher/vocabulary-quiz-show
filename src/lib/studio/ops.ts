@@ -70,8 +70,9 @@ export function updateWord(
   return mapSet(
     a,
     setId,
-    (s) =>
-      edited(
+    (s) => {
+      const target = s.words.find((w) => w.id === wordId);
+      const base = edited(
         s,
         s.words.map((w) => {
           if (w.id !== wordId) return w;
@@ -80,9 +81,28 @@ export function updateWord(
           if (patch.word !== undefined && patch.word.trim() !== w.word.trim() && !("illustration" in patch)) delete next.illustration;
           return next;
         }),
-      ),
+      );
+      if (!target || patch.hints === undefined) return base;
+      // What the teacher types is remembered per hint, so an AI rewrite of another hint cannot overwrite it.
+      const marks = new Set(s.handHints?.[wordId] ?? []);
+      patch.hints.forEach((h, i) => {
+        if (!(h ?? "").trim()) marks.delete(i);
+        else if (h !== (target.hints[i] ?? "")) marks.add(i);
+      });
+      const hand = { ...(s.handHints ?? {}) };
+      if (marks.size) hand[wordId] = [...marks].sort();
+      else delete hand[wordId];
+      const { handHints: _old, ...rest } = base;
+      void _old;
+      return Object.keys(hand).length ? { ...rest, handHints: hand } : rest;
+    },
     now,
   );
+}
+
+/** Hints the teacher wrote by hand for this word that are still filled in. Clearing a hint hands it back to the AI. */
+export function protectedHints(set: StudioSet, w: VocabWord): number[] {
+  return (set.handHints?.[w.id] ?? []).filter((i) => (w.hints[i] ?? "").trim());
 }
 
 /**
@@ -106,8 +126,29 @@ export function setIllustration(a: Activity, setId: string, wordId: string, illu
   );
 }
 
+/** Replace a word's hints outright (not recorded as the teacher's own wording). The AI paths use applyAiHints, which protects hand-written hints. */
 export function setHints(a: Activity, setId: string, wordId: string, hints: string[]): Activity {
-  return updateWord(a, setId, wordId, { hints });
+  return mapSet(a, setId, (s) => edited(s, s.words.map((w) => (w.id === wordId ? { ...w, hints } : w))));
+}
+
+/**
+ * AI-written hints go in only where the teacher has not written their own: hints in `protectedHints` are kept as they are, and
+ * `only` (if given) limits the change to those positions. Returns what was kept and what changed.
+ */
+export function applyAiHints(a: Activity, setId: string, wordId: string, fresh: string[], only?: number[]): { activity: Activity; kept: number[]; changed: number[] } {
+  const set = a.sets.find((s) => s.id === setId);
+  const word = set?.words.find((w) => w.id === wordId);
+  if (!set || !word) return { activity: a, kept: [], changed: [] };
+  const mine = protectedHints(set, word);
+  const kept = [0, 1, 2].filter((i) => mine.includes(i) && (!only || only.includes(i)));
+  const changed = [0, 1, 2].filter((i) => !mine.includes(i) && (!only || only.includes(i)) && (fresh[i] ?? "") !== (word.hints[i] ?? ""));
+  if (!changed.length) return { activity: a, kept, changed };
+  const hints = [0, 1, 2].map((i) => (changed.includes(i) ? fresh[i] : word.hints[i] ?? ""));
+  return {
+    activity: mapSet(a, setId, (s) => edited(s, s.words.map((w) => (w.id === wordId ? { ...w, hints } : w)))),
+    kept,
+    changed,
+  };
 }
 
 /** All words in the activity (for "don't repeat these" requests). */
@@ -159,10 +200,12 @@ export function regenerateSet(
 ): { activity: Activity; replaced: number } {
   let replaced = 0;
   const activity = mapSet(a, setId, (s) => {
-    const used = new Set(s.words.filter((w) => s.lockedIds.includes(w.id)).map((w) => normalize(w.word)));
+    // A word the teacher has written hints for is kept like a locked word: regenerating the set never overwrites their wording.
+    const keep = (w: VocabWord) => s.lockedIds.includes(w.id) || protectedHints(s, w).length > 0;
+    const used = new Set(s.words.filter(keep).map((w) => normalize(w.word)));
     const queue = fresh.filter((f) => !used.has(normalize(f.word)));
     const words = s.words.map((w) => {
-      if (s.lockedIds.includes(w.id)) return w;
+      if (keep(w)) return w;
       const next = queue.shift();
       if (!next) return w;
       replaced++;

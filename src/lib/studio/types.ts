@@ -87,6 +87,8 @@ export interface StudioSet {
   requested?: number;
   /** Ids of approved words whose hints failed validation when generated. They stay in the set but block approval until their hints are fixed. */
   flagged?: string[];
+  /** Hints the teacher typed or changed by hand: word id → hint indexes (0-based). AI rewrites and repairs never replace these. */
+  handHints?: Record<string, number[]>;
   /** Approved words that still have no item. While any exist the set cannot be approved or hosted. */
   missing?: MissingItem[];
   /** Word ids the teacher has locked: whole-set regeneration never replaces these. */

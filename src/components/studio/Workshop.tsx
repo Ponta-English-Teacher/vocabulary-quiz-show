@@ -5,8 +5,8 @@ import type { VocabSet, VocabWord } from "@/data/vocab";
 import { callStudio, StudioClientError } from "@/lib/studio/ai/client";
 import type { StudioData, StudioRequest } from "@/lib/studio/ai/types";
 import {
-  addSet, allTargetForms, appendWords, approveSet, dropMissing, fillMissing, noteMissingFailure, regenerateSet, reopenSet, removeSet, renameActivity,
-  replaceWord, setBrief, setHints, setIllustration, splitApproved, toggleLock, toVocabSet, updateWord,
+  addSet, allTargetForms, appendWords, applyAiHints, protectedHints, approveSet, dropMissing, fillMissing, noteMissingFailure, regenerateSet, reopenSet, removeSet, renameActivity,
+  replaceWord, setBrief, setIllustration, splitApproved, toggleLock, toVocabSet, updateWord,
 } from "@/lib/studio/ops";
 import { normalize } from "@/lib/answer";
 import { getBrowserStorage, saveActivity } from "@/lib/studio/storage";
@@ -169,14 +169,21 @@ export function Workshop({
     setNotice({ kind: "info", text: `Replaced “${word.word}” with “${data.word.word}”. The other words weren't touched.` });
   };
 
-  const doHints = async (setId: string, wordId: string, instruction?: string) => {
+  const doHints = async (setId: string, wordId: string, instruction?: string, only?: number[]) => {
     const word = findWord(setId, wordId);
-    if (!word) return setNotice({ kind: "error", text: "That word no longer exists." });
+    const set = actRef.current.sets.find((x) => x.id === setId);
+    if (!word || !set) return setNotice({ kind: "error", text: "That word no longer exists." });
+    // Hints the teacher wrote themselves are never overwritten by the AI. Clearing a hint hands it back.
+    const mine = protectedHints(set, word);
+    const open = [0, 1, 2].filter((i) => !mine.includes(i) && (!only || only.includes(i)));
+    if (!open.length) return setNotice({ kind: "info", text: `The hint${mine.length === 1 ? "" : "s"} to change ${mine.length === 1 ? "is" : "are"} your own wording, so I left ${mine.length === 1 ? "it" : "them"} alone. Edit ${mine.length === 1 ? "it" : "them"} yourself, or clear ${mine.length === 1 ? "it" : "them"} and ask again.` });
     setBusy("Writing new hints");
     setBusyWordId(wordId);
     const { data } = await call("regenerate-hints", { brief: actRef.current.brief, word, instruction: instruction || undefined });
-    commit(setHints(actRef.current, setId, wordId, data.hints));
-    setNotice({ kind: "info", text: `New hints for “${word.word}”. Only its hints changed.` });
+    const r = applyAiHints(actRef.current, setId, wordId, data.hints, only);
+    commit(r.activity);
+    const nums = (l: number[]) => l.map((i) => i + 1).join(", ");
+    setNotice({ kind: "info", text: `New hint${r.changed.length === 1 ? "" : "s"} (${nums(r.changed)}) for “${word.word}”.${r.kept.length ? ` Your own hint${r.kept.length === 1 ? "" : "s"} ${nums(r.kept)} ${r.kept.length === 1 ? "was" : "were"} kept.` : ""} Nothing else changed.` });
   };
 
   /** Draw one picture for one word. A failure is reported and changes nothing: the word stays playable without a picture. */
@@ -371,7 +378,7 @@ export function Workshop({
           onEdit={(s, w, patch) => { if (!frozen(s)) commit(updateWord(actRef.current, s, w, patch)); }}
           onToggleLock={(s, w) => commit(toggleLock(actRef.current, s, w))}
           onReplace={(s, w, ins) => { if (!frozen(s)) void run("Finding a replacement", () => doReplace(s, w, ins)); }}
-          onNewHints={(s, w, ins) => { if (!frozen(s)) void run("Writing new hints", () => doHints(s, w, ins)); }}
+          onNewHints={(s, w, ins, only) => { if (!frozen(s)) void run("Writing new hints", () => doHints(s, w, ins, only)); }}
           onIllustrate={(s, w) => run("Drawing a picture", () => doIllustrate(s, w))}
           onIllustrateAll={(s) => run("Drawing pictures", () => doIllustrateAll(s))}
           onRemoveIllustration={(s, w) => commit(setIllustration(actRef.current, s, w, undefined))}
