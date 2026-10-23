@@ -39,7 +39,18 @@ ITEM RULES
     Prefer concrete, understandable information that fits the learners' level. Avoid generic hints that could describe many words (for example "it is a place", "it is used every day", "it is a feeling") and avoid a mechanical sentence template.
     Do NOT give every word the same pattern. Across a set, vary the kind of clue and the sentence shape; do not open every hint 1 the same way, and do not use "unlike a ___" or a fill-in-the-blank sentence for every word. There is no fixed recipe: origins, culture, position or contrast are options for a word where they genuinely help, never a required slot.
     Only state facts you are sure are true. Never invent an origin, history, cultural custom or scientific fact to make a hint sound interesting; if you are not sure, use an everyday situation instead.
-    The teacher's own wishes about hints (in learnerFocus, objectives or an instruction) come first: follow them for every word, while keeping the hints progressive and free of the target word.
+    Every hint must add NEW information. Never restate an earlier hint in other words (three ways of saying "not sure" is one hint, not three). A good progression often runs: a situation the Giver can describe -> a distinctive feature or contrast that narrows it -> a clear, direct explanation. That is an example, not a template: choose what suits the word.
+    Hint 1 should start a conversation: a concrete scene, person or moment the Giver can talk about and the Taker can ask about. It must not already define the word or name its function in a single phrase (not "you do this to talk quietly", not "you use this to send a letter"). Keep the strongest, most defining clue for hint 3.
+    Avoid filler openings such as "This word describes...", "This is a thing that...", "You might do this when...", "This feeling is about..." unless nothing else fits; start with the scene or the detail itself. Never open all hints in a set the same way.
+    Examples (for words NOT in your task, to show the quality wanted):
+      "kettle" — POOR: ["It is a kitchen tool.", "You use it to heat water.", "It is used for hot drinks."] (generic, and each line repeats the last).
+        GOOD: ["Someone gets up early and wants a hot drink, but first they have to wait a few minutes.", "It makes a loud noise when the water is ready, and it often has a spout and a handle.", "You fill it with water, switch it on, and pour the water into your cup for tea or coffee."]
+      "nervous" — POOR: ["This feeling is about being not calm.", "You feel this when you are worried.", "It means you are anxious."] (three synonyms).
+        GOOD: ["Imagine you are waiting outside a room before an important interview.", "Your hands feel cold and your stomach feels strange, even though nothing bad has happened yet.", "It is the feeling before something important; being ____ is not as strong as being scared."]
+      "fridge" — POOR: ["You use this every day.", "It is in many houses.", "It is a big thing."] (could be anything).
+        GOOD: ["When you come home hungry, you open this and look inside, and a little light comes on.", "It is cold inside, and milk and eggs usually stay in it.", "It keeps food fresh; the part for ice cream is called the freezer."]
+    The teacher's own wishes about hints (in learnerFocus, objectives or an instruction) come first: follow them for EVERY hint of EVERY word, including limits on content or order (for example "no calendar-order clue before hint 3"), and check each hint against them before you answer. If the wishes changed during the conversation, the teacher's LATEST explicit instruction wins over earlier ones and over the brief. Hints must still be progressive and free of the target word.
+    Keep the English at the learners' level: short everyday words, no obscure etymology, no invented cultural facts.
   A first-letter clue is allowed ONLY as an extra tacked onto hint 3 of at most one word in three, never as a hint on its own. NEVER write a hint that is just "The first letter is x", "It starts with x", or the number of words. Do not reuse the same hint pattern across items. A hint must NEVER contain the target word, its inflections, or any form in "accept".
 - For abstract words, use situations and examples the Giver can describe in words.
 - "looks", "use", "phrases" — GIVER NOTES, private support the Giver reads to understand the word and answer the Taker's questions in their own words (they never have to read it aloud). Adapt them to the kind of word:
@@ -74,7 +85,7 @@ YOUR JOB IN CHAT
 - Ask at most ONE or TWO short clarification questions, and only when something important is truly missing. Otherwise confirm what you understood and offer to generate.
 - Keep replies short and practical, but concrete: when discussing candidates, NAME real words.
 - When you suggest candidates, show a deliberate mix of familiar, moderately challenging and unfamiliar words (labelled by CEFR where helpful), and say why familiar words are included. Never remove or swap a word merely because its CEFR label differs from the activity level.
-- If the teacher says anything about how hints should be written (style, topics to draw on, things to avoid, e.g. "use word origins for the weekdays"), record it in brief.learnerFocus in their own words and keep it in every later reply until they change it; hint-writing will follow it.
+- If the teacher says anything about how hints should be written (style, topics to draw on, things to avoid, e.g. "use word origins for the weekdays"), record it in brief.learnerFocus in their own words and keep it in every later reply; when they change a wish, their latest instruction replaces the old one; hint-writing will follow it.
 - Update the brief from the whole conversation; keep earlier decisions unless the teacher changes them. Do not shrink the scope.
 
 DISCUSSION FIRST
@@ -122,7 +133,7 @@ export function replacePrompt(brief: Brief, current: VocabWord, exclude: string[
     { role: "system" as const, content: `${RULES}\nReturn: {"word": ${itemShape}} — exactly one item.` },
     {
       role: "user" as const,
-      content: `Replace the word "${current.word}" (${current.cefr}, ${current.category}) with a different one that fits the same brief. Keep the set's mix of familiar and challenging words: the replacement need not match the activity level, and may be of a similar difficulty to the word it replaces unless the teacher says otherwise.\nBRIEF: ${briefText(brief)}\nDo NOT use any of these words: ${JSON.stringify([...exclude, current.word])}\n${instruction ? `Teacher's instruction: ${instruction}\n` : ""}`,
+      content: `Replace the word "${current.word}" (${current.cefr}, ${current.category}) with a different one that fits the same brief. Keep the set's mix of familiar and challenging words: the replacement need not match the activity level, and may be of a similar difficulty to the word it replaces unless the teacher says otherwise.\nBRIEF: ${briefText(brief)}\nDo NOT use any of these words: ${JSON.stringify([...exclude, current.word])}\n${instruction ? `Teacher's instruction (latest; it overrides the brief if they differ): ${instruction}\n` : ""}`,
     },
   ];
 }
@@ -132,7 +143,7 @@ export function hintsPrompt(brief: Brief, word: VocabWord, instruction?: string)
     { role: "system" as const, content: `${RULES}\nReturn: {"hints": [string, string, string]} — fresh hints only, for the given word.` },
     {
       role: "user" as const,
-      content: `Write three NEW progressive hints for the target word "${word.word}" (${word.partOfSpeech}, ${word.cefr}). Meaning: ${word.meaning}\nAccepted alternatives (also forbidden in hints): ${JSON.stringify(word.accept ?? [])}\nThe old hints were (write different ones): ${JSON.stringify(word.hints)}\nBRIEF (the teacher's wishes about level, learners and hints apply): ${briefText(brief)}\n${instruction ? `Teacher's instruction: ${instruction}\n` : ""}`,
+      content: `Write three NEW progressive hints for the target word "${word.word}" (${word.partOfSpeech}, ${word.cefr}). Meaning: ${word.meaning}\nAccepted alternatives (also forbidden in hints): ${JSON.stringify(word.accept ?? [])}\nThe old hints were (write different ones): ${JSON.stringify(word.hints)}\nBRIEF (the teacher's wishes about level, learners and hints apply): ${briefText(brief)}\n${instruction ? `Teacher's instruction (latest; it overrides the brief if they differ): ${instruction}\n` : ""}`,
     },
   ];
 }

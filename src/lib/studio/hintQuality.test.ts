@@ -24,6 +24,30 @@ describe("hint-writing instructions", () => {
       expect(s).not.toMatch(/hint 1 must (explain|be) word origins/i);
     }
   });
+  it("requires new information per hint, a conversation-starting hint 1, no filler, and gives good-versus-poor examples", () => {
+    for (const m of [generatePrompt(brief, 5, []), approvedPrompt(brief, ["Tuesday"]), replacePrompt(brief, word, []), hintsPrompt(brief, word)]) {
+      const s = sys(m);
+      expect(s).toMatch(/add NEW information/);
+      expect(s).toMatch(/situation the Giver can describe -> a distinctive feature or contrast that narrows it -> a clear, direct explanation[\s\S]*not a template/);
+      expect(s).toMatch(/Hint 1 should start a conversation[\s\S]*must not already define the word/);
+      expect(s).toMatch(/Avoid filler openings such as "This word describes\.\.\."/);
+      expect(s).toMatch(/POOR:[\s\S]*GOOD:/);
+      expect(s).toMatch(/LATEST explicit instruction wins/);
+      expect(s).toMatch(/limits on content or order/);
+    }
+  });
+  it("the examples do not use the words from the evaluation sets, so they cannot be copied", () => {
+    const ex = sys(generatePrompt(brief, 5, []));
+    for (const w of ["Tuesday", "hesitate", "stubborn", "convenience store", "whisper"]) expect(ex).not.toContain(`"${w}" —`);
+  });
+  it("the good examples themselves obey the app's own hint checks", async () => {
+    const { hintProblems } = await import("./validation");
+    const mk = (word: string, hints: string[]) => ({ ...word_, word, hints } as never);
+    const word_ = word;
+    expect(hintProblems(mk("kettle", ["Someone gets up early and wants a hot drink, but first they have to wait a few minutes.", "It makes a loud noise when the water is ready, and it often has a spout and a handle.", "You fill it with water, switch it on, and pour the water into your cup for tea or coffee."]))).toEqual([]);
+    expect(hintProblems(mk("nervous", ["Imagine you are waiting outside a room before an important interview.", "Your hands feel cold and your stomach feels strange, even though nothing bad has happened yet.", "It is the feeling before something important; being ____ is not as strong as being scared."]))).toEqual([]);
+    expect(hintProblems(mk("fridge", ["When you come home hungry, you open this and look inside, and a little light comes on.", "It is cold inside, and milk and eggs usually stay in it.", "It keeps food fresh; the part for ice cream is called the freezer."]))).toEqual([]);
+  });
   it("teacher hint preferences reach generation, replacement and hint regeneration", () => {
     for (const m of [generatePrompt(brief, 5, []), approvedPrompt(brief, ["Tuesday"]), replacePrompt(brief, word, []), hintsPrompt(brief, word)]) {
       expect(user(m)).toContain(PREF);
