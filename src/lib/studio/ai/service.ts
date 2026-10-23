@@ -150,7 +150,7 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
           let tried = flaw.reason; // what the next rewrite is told to avoid
           for (let t = 0; t < HINT_REPAIRS; t++) {
             try {
-              const raw = await callOpenAIJson(cfg, hintsPrompt(req.brief, w, `Your previous hints were rejected: ${tried} Write three different hints that avoid these problems. The opening hint must be a real situation (who, when, where), and no hint may contain the word "${w.word}" or any part of it.`));
+              const raw = await callOpenAIJson(cfg, hintsPrompt(req.brief, w, `${req.instruction ? `${req.instruction}\n` : ""}Your previous hints were rejected: ${tried} Write three different hints that avoid these problems. The opening hint must be a real situation (who, when, where), and no hint may contain the word "${w.word}" or any part of it.`));
               const hints = parseHints(raw, w);
               const bad = hintProblems({ ...w, hints });
               if (bad.length) { tried = bad.map((p) => p.message).join(" "); continue; }

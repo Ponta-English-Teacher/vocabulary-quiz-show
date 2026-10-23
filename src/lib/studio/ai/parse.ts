@@ -29,7 +29,7 @@ export function sanitizeBrief(raw: unknown, fallback: Brief = EMPTY_BRIEF): Brie
     topic: raw.topic === undefined ? fallback.topic : clip(raw.topic, 120),
     level: raw.level === undefined ? fallback.level : normalizeCefr(raw.level),
     objectives: raw.objectives === undefined ? fallback.objectives : strList(raw.objectives, 6, 160),
-    learnerFocus: raw.learnerFocus === undefined ? fallback.learnerFocus : clip(raw.learnerFocus, 300),
+    learnerFocus: raw.learnerFocus === undefined ? fallback.learnerFocus : clip(raw.learnerFocus, 500),
     numSets: Math.min(MAX_SETS_PER_REQUEST, Math.max(1, sets)),
     avoid: raw.avoid === undefined ? fallback.avoid : strList(raw.avoid, 20, 60),
     balance: raw.balance === undefined ? fallback.balance : clip(raw.balance, 300),

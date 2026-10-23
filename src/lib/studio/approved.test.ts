@@ -179,8 +179,8 @@ describe("Fix 2 — hint quality and CEFR accuracy", () => {
     const r = rules();
     expect(r).toMatch(/PROGRESS — each strictly more informative/);
     expect(r).toMatch(/hint 1 = the OPENING HINT/);
-    expect(r).toMatch(/hint 2 = distinctive features/);
-    expect(r).toMatch(/hint 3 = strongest clue/);
+    expect(r).toMatch(/hint 2 = more specific: narrows the possibilities/);
+    expect(r).toMatch(/hint 3 = a strong, fairly direct clue/);
     expect(r).toMatch(/NEVER a generic label like "it is a kitchen tool", "it is used in the kitchen"/);
     expect(r).toMatch(/NEVER write a hint that is just "The first letter is x"/);
     expect(r).toMatch(/at most one word in three/);

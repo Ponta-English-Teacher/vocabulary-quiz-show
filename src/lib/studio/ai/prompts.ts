@@ -32,8 +32,14 @@ ITEM RULES
 - "example": one natural example sentence using the word.
 - "hints": EXACTLY three hints the Giver can say aloud. They must PROGRESS — each strictly more informative than the one before, and each a different KIND of clue:
     hint 1 = the OPENING HINT. The app shows it automatically to the GIVER ONLY (the Taker never sees it) at the start of the round, and it is FREE; the Giver uses it to start explaining in their own English while the Taker asks questions to find the word. It must set a meaningful SITUATION: a specific scene, who uses it, when or where you meet it — one or two simple sentences. Narrow enough to exclude most other words; NEVER a generic label like "it is a kitchen tool", "it is used in the kitchen" or "it is used for cooking". Example for "colander": "You often need this after boiling pasta or washing vegetables."
-    hint 2 = distinctive features: how it works, its shape or material, what it is usually combined with, a typical collocation, or a sentence with a blank (____).
-    hint 3 = strongest clue: a contrast with a similar item ("unlike a ___, it ..."), a near-synonym or opposite, or a vivid sentence with a blank that only this word fits.
+    hint 2 = more specific: narrows the possibilities with something the Taker can picture or recognise.
+    hint 3 = a strong, fairly direct clue: after it, a thoughtful Taker should usually be able to guess.
+  HINT QUALITY — the hints start a conversation, they do not just give the answer away:
+    For EACH word, first find what is distinctive and meaningful about THIS word, then choose the best kind of clue for it. Sources to draw on: everyday experience, typical situations, function or purpose, actions and behaviour, feelings and reactions, cultural associations, a word's origin (only when accurate and easy to understand), a contrast with a familiar thing.
+    Prefer concrete, understandable information that fits the learners' level. Avoid generic hints that could describe many words (for example "it is a place", "it is used every day", "it is a feeling") and avoid a mechanical sentence template.
+    Do NOT give every word the same pattern. Across a set, vary the kind of clue and the sentence shape; do not open every hint 1 the same way, and do not use "unlike a ___" or a fill-in-the-blank sentence for every word. There is no fixed recipe: origins, culture, position or contrast are options for a word where they genuinely help, never a required slot.
+    Only state facts you are sure are true. Never invent an origin, history, cultural custom or scientific fact to make a hint sound interesting; if you are not sure, use an everyday situation instead.
+    The teacher's own wishes about hints (in learnerFocus, objectives or an instruction) come first: follow them for every word, while keeping the hints progressive and free of the target word.
   A first-letter clue is allowed ONLY as an extra tacked onto hint 3 of at most one word in three, never as a hint on its own. NEVER write a hint that is just "The first letter is x", "It starts with x", or the number of words. Do not reuse the same hint pattern across items. A hint must NEVER contain the target word, its inflections, or any form in "accept".
 - For abstract words, use situations and examples the Giver can describe in words.
 - "looks", "use", "phrases" — GIVER NOTES, private support the Giver reads to understand the word and answer the Taker's questions in their own words (they never have to read it aloud). Adapt them to the kind of word:
@@ -68,6 +74,7 @@ YOUR JOB IN CHAT
 - Ask at most ONE or TWO short clarification questions, and only when something important is truly missing. Otherwise confirm what you understood and offer to generate.
 - Keep replies short and practical, but concrete: when discussing candidates, NAME real words.
 - When you suggest candidates, show a deliberate mix of familiar, moderately challenging and unfamiliar words (labelled by CEFR where helpful), and say why familiar words are included. Never remove or swap a word merely because its CEFR label differs from the activity level.
+- If the teacher says anything about how hints should be written (style, topics to draw on, things to avoid, e.g. "use word origins for the weekdays"), record it in brief.learnerFocus in their own words and keep it in every later reply until they change it; hint-writing will follow it.
 - Update the brief from the whole conversation; keep earlier decisions unless the teacher changes them. Do not shrink the scope.
 
 DISCUSSION FIRST
@@ -125,7 +132,7 @@ export function hintsPrompt(brief: Brief, word: VocabWord, instruction?: string)
     { role: "system" as const, content: `${RULES}\nReturn: {"hints": [string, string, string]} — fresh hints only, for the given word.` },
     {
       role: "user" as const,
-      content: `Write three NEW progressive hints for the target word "${word.word}" (${word.partOfSpeech}, ${word.cefr}). Meaning: ${word.meaning}\nAccepted alternatives (also forbidden in hints): ${JSON.stringify(word.accept ?? [])}\nThe old hints were (write different ones): ${JSON.stringify(word.hints)}\nLEARNER NOTES: ${brief.learnerFocus || "none"}\n${instruction ? `Teacher's instruction: ${instruction}\n` : ""}`,
+      content: `Write three NEW progressive hints for the target word "${word.word}" (${word.partOfSpeech}, ${word.cefr}). Meaning: ${word.meaning}\nAccepted alternatives (also forbidden in hints): ${JSON.stringify(word.accept ?? [])}\nThe old hints were (write different ones): ${JSON.stringify(word.hints)}\nBRIEF (the teacher's wishes about level, learners and hints apply): ${briefText(brief)}\n${instruction ? `Teacher's instruction: ${instruction}\n` : ""}`,
     },
   ];
 }
