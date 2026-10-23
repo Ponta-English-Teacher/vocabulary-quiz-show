@@ -23,7 +23,7 @@ export function HostClass() {
   const [lists, setLists] = useState<LibraryList[]>([]);
   const [choice, setChoice] = useState<Choice | null>(null);
   useEffect(() => {
-    const read = () => setLists(libraryLists(loadActivities(getBrowserStorage()).activities));
+    const read = () => setLists(libraryLists(loadActivities(getBrowserStorage()).activities).filter((l) => l.ready));
     read();
     window.addEventListener("focus", read);
     return () => window.removeEventListener("focus", read);

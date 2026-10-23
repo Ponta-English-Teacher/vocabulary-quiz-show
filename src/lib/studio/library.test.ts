@@ -174,11 +174,24 @@ describe("existing data stays accessible", () => {
     expect(s.getItem(KEY)).toBe(raw); // reading the library wrote nothing
     expect(lists[0].words.map((w) => w.word)).toEqual(["ladder", "bucket"]);
   });
-  it("an approved set that fails the completeness check is not offered for hosting", () => {
+  it("an approved set that is missing a word is still LISTED (so it can be fixed, shared or deleted) but is not offered for hosting", () => {
     const s = memory();
     const a = activity("Broken", [["ladder", "bucket"]], "2026-01-01T00:00:00.000Z");
     a.sets[0].missing = [{ word: "rope", reason: "no item", index: 2 }];
     s.setItem(KEY, JSON.stringify([a]));
-    expect(libraryLists(loadActivities(s).activities)).toEqual([]);
+    const l = libraryLists(loadActivities(s).activities);
+    expect(l).toHaveLength(1);
+    expect(l[0]).toMatchObject({ ready: false, count: 2 });
+    expect(l[0].problems.join(" ")).toMatch(/rope/);
+  });
+  it("an approved set whose words now fail a validation rule is never hidden: it stays listed and hostable, with a note", () => {
+    const s = memory();
+    const a = activity("Older set", [["ladder", "bucket"]], "2026-01-01T00:00:00.000Z");
+    a.sets[0].words[0].hints[1] = "A ladder is something you climb."; // a hint that gives the word away
+    s.setItem(KEY, JSON.stringify([a]));
+    const l = libraryLists(loadActivities(s).activities);
+    expect(l.map((x) => x.title)).toEqual(["Older set — Set 1"]);
+    expect(l[0].ready).toBe(true);
+    expect(l[0].problems.length).toBeGreaterThan(0);
   });
 });

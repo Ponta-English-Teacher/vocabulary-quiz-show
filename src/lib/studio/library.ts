@@ -17,18 +17,25 @@ export interface LibraryList {
   title: string;
   count: number;
   words: VocabWord[];
+  /** False when the set is still missing words: it is shown (so it can be fixed or deleted) but cannot be hosted. */
+  ready: boolean;
+  /** Anything that needs the teacher's attention. Never hides a list. */
+  problems: string[];
 }
 
 export const listKey = (activityId: string, setId: string) => `${activityId}:${setId}`;
 
-/** Every approved, complete set of every saved activity, newest-created activity first, so editing or deleting never reorders the others (sets keep their order). */
+/** Every approved set of every saved activity, newest-created activity first, so editing or deleting never reorders the others (sets keep their order). */
 export function libraryLists(activities: Activity[]): LibraryList[] {
   return [...activities]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .flatMap((a) =>
       a.sets
-        .filter((s) => s.status === "approved" && approvalProblems(s).length === 0)
-        .map((s) => ({ key: listKey(a.id, s.id), activityId: a.id, setId: s.id, title: `${a.title} — ${s.title.trim() || "Set"}`, count: s.words.length, words: s.words })),
+        .filter((s) => s.status === "approved")
+        .map((s) => ({
+          key: listKey(a.id, s.id), activityId: a.id, setId: s.id, title: `${a.title} — ${s.title.trim() || "Set"}`, count: s.words.length, words: s.words,
+          ready: !s.missing?.length && s.words.length > 0, problems: approvalProblems(s),
+        })),
     );
 }
 

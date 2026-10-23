@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { VocabWord } from "@/data/vocab";
+import { StudyShareControls } from "../study/StudyShare";
 import type { Restriction } from "@/lib/studio/restrictions";
 import { approvalProblems, levelMix, mixAdvice, setProgress, wordsNeedingHints } from "@/lib/studio/ops";
 import { SET_SIZE, type StudioSet } from "@/lib/studio/types";
@@ -17,6 +18,7 @@ export function SetPanel({
   canGenerate,
   onSelect,
   onRenameSet,
+  shareFor,
   onAddSet,
   onRemoveSet,
   onEdit,
@@ -45,6 +47,8 @@ export function SetPanel({
   onSelect: (id: string) => void;
   /** Name the list: it appears under this name in the Vocabulary Library. */
   onRenameSet?: (setId: string, title: string) => void;
+  /** Where to publish a student study page for an approved set (its library key and title). */
+  shareFor?: (setId: string) => { source: string; title: string };
   onAddSet: () => void;
   onRemoveSet: (id: string) => void;
   onEdit: (setId: string, wordId: string, patch: Partial<Omit<VocabWord, "id">>) => void;
@@ -199,6 +203,7 @@ export function SetPanel({
                 <span className="approved__stamp">✓ Approved</span>
                 <button type="button" className="btn btn--hero btn--inline" onClick={() => onPlay(set.id)}>Play this set</button>
                 <button type="button" className="btn btn--small btn--ghost" disabled={disabled} onClick={() => onReopen(set.id)}>Reopen for editing</button>
+                {shareFor ? <StudyShareControls source={shareFor(set.id).source} title={shareFor(set.id).title} words={set.words} /> : null}
               </div>
             ) : (
               <button type="button" className="btn btn--hero btn--inline" disabled={disabled} onClick={() => onApprove(set.id)}>

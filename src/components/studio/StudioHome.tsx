@@ -46,7 +46,7 @@ export function StudioHome({
   return (
     <section className="studio-home" aria-labelledby="home-title">
       <div className="studio-head">
-        <h2 id="home-title" className="studio-h">Your activities</h2>
+        <h2 id="home-title" className="studio-h">Library & activities</h2>
         <button type="button" className="btn btn--hero btn--inline" onClick={onNew}>New activity</button>
       </div>
 
@@ -54,6 +54,41 @@ export function StudioHome({
       {!storageOk ? <Notice kind="error">This browser is blocking local storage, so activities can&apos;t be saved.</Notice> : null}
       {skipped > 0 ? <Notice kind="info">{skipped} saved item{skipped === 1 ? " was" : "s were"} unreadable and ignored.</Notice> : null}
 
+      <section aria-labelledby="library-title" className="library">
+        <div className="libhead">
+          <h2 id="library-title" className="studio-h">Vocabulary Library</h2>
+          <p className="note">Every approved list you have saved. Choose any of them when you host a class.</p>
+        </div>
+        {library.length === 0 ? (
+          <p className="empty">No approved lists yet. Open an activity, then press <b>Approve this set</b> in its lineup, and the list appears here with its Share and Delete buttons.</p>
+        ) : (
+          <ul className="lineup">
+            {library.map((l) => (
+              <li key={l.key} className="lineup__row">
+                <div className="lineup__main">
+                  <h3 className="lineup__title">{l.title}</h3>
+                  <p className="lineup__meta">{l.count} word{l.count === 1 ? "" : "s"} · {l.words.map((w) => w.word).join(", ")}</p>
+                  {l.problems.length ? <p className="note">Needs attention before hosting: {l.problems[0]}</p> : null}
+                  <StudyShareControls source={l.key} title={l.title} words={l.words} />
+                </div>
+                <div className="lineup__actions">
+                  <button type="button" className="btn btn--small" onClick={() => onEditList(l)}>Edit</button>
+                  <ConfirmButton
+                    label="Delete"
+                    confirmText={`Delete the list “${l.title}”? This can't be undone. Your other lists aren't affected.`}
+                    confirmLabel="Delete list"
+                    onConfirm={() => onDeleteList(l)}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+
+
+      <div className="libhead"><h2 className="studio-h">Activities</h2></div>
       <ul className="lineup">
         {activities.map((a) => {
           const ok = approvedSets(a).length;
@@ -100,38 +135,6 @@ export function StudioHome({
           Nothing saved yet. Start a new activity and describe what you want — for example, <em>“B2 vocabulary about everyday physical actions.”</em>
         </p>
       ) : null}
-
-      <section aria-labelledby="library-title" className="library">
-        <div className="libhead">
-          <h2 id="library-title" className="studio-h">Vocabulary Library</h2>
-          <p className="note">Every approved list you have saved. Choose any of them when you host a class.</p>
-        </div>
-        {library.length === 0 ? (
-          <p className="empty">No approved lists yet. Approve a set (1–10 words) in an activity and it appears here.</p>
-        ) : (
-          <ul className="lineup">
-            {library.map((l) => (
-              <li key={l.key} className="lineup__row">
-                <div className="lineup__main">
-                  <h3 className="lineup__title">{l.title}</h3>
-                  <p className="lineup__meta">{l.count} word{l.count === 1 ? "" : "s"} · {l.words.map((w) => w.word).join(", ")}</p>
-                  <StudyShareControls source={l.key} title={l.title} words={l.words} />
-                </div>
-                <div className="lineup__actions">
-                  <button type="button" className="btn btn--small" onClick={() => onEditList(l)}>Edit</button>
-                  <ConfirmButton
-                    label="Delete"
-                    confirmText={`Delete the list “${l.title}”? This can't be undone. Your other lists aren't affected.`}
-                    confirmLabel="Delete list"
-                    onConfirm={() => onDeleteList(l)}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
 
       <StorageNotice />
     </section>
