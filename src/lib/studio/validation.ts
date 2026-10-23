@@ -3,6 +3,7 @@ import { normalize } from "@/lib/answer";
 import { coerceAskKind } from "@/lib/askQuestions";
 import { normalizeJa } from "@/lib/japanese";
 import { newId } from "./ids";
+import { restrictionProblems, type Restriction } from "./restrictions";
 
 /**
  * Validation for vocabulary items — used for AI output, saved data and live teacher editing.
@@ -37,7 +38,7 @@ export function coerceIllustration(raw: unknown, allowMarker = false): { src: st
 
 export interface WordIssue {
   /** Machine-readable reason, where one matters (e.g. AI output with letter-only hints is rejected). */
-  code?: "letter-only" | "too-short" | "vague-opening" | "no-japanese" | "no-giver-info";
+  code?: "letter-only" | "too-short" | "vague-opening" | "no-japanese" | "no-giver-info" | "restriction";
   field: "word" | "accept" | "partOfSpeech" | "cefr" | "category" | "meaning" | "example" | "hints" | "giverInfo" | "ja";
   hintIndex?: number;
   severity: "error" | "warning";
@@ -124,7 +125,7 @@ const VAGUE_OPENING: RegExp[] = [
 ];
 export const isVagueOpeningHint = (h: string): boolean => VAGUE_OPENING.some((r) => r.test(h.trim()));
 
-export function validateWord(w: VocabWord): WordIssue[] {
+export function validateWord(w: VocabWord, restrictions: readonly Restriction[] = []): WordIssue[] {
   const issues: WordIssue[] = [];
   const err = (field: WordIssue["field"], message: string, hintIndex?: number) =>
     issues.push({ field, message, severity: "error", hintIndex });
@@ -190,14 +191,16 @@ export function validateWord(w: VocabWord): WordIssue[] {
   }
 
   if ((w.accept ?? []).length > LIMITS.accept) err("accept", `At most ${LIMITS.accept} alternative answers.`);
+  // The teacher's own restrictions on hint content (e.g. no calendar-order clue in hints 1 and 2).
+  for (const p of restrictionProblems(w.hints, restrictions)) issues.push({ field: "hints", hintIndex: p.hintIndex, severity: "error", code: "restriction", message: p.message });
   return issues;
 }
 
 export const hasErrors = (issues: WordIssue[]) => issues.some((i) => i.severity === "error");
 
 /** Problems with a word's hints that make it not ready for play: a leak, an empty/long hint, a letter-only or generic opening hint. */
-export function hintProblems(w: VocabWord): WordIssue[] {
-  return validateWord(w).filter((p) => p.field === "hints" && (p.severity === "error" || p.code === "letter-only" || p.code === "vague-opening"));
+export function hintProblems(w: VocabWord, restrictions: readonly Restriction[] = []): WordIssue[] {
+  return validateWord(w, restrictions).filter((p) => p.field === "hints" && (p.severity === "error" || p.code === "letter-only" || p.code === "vague-opening"));
 }
 
 export type CoerceResult = { word: VocabWord } | { errors: string[] };
@@ -318,7 +321,7 @@ export interface ParsedWords {
 /** Validate a whole AI list: shape, content rules, duplicates (also against `exclude`). */
 export function parseGeneratedWords(
   raw: unknown,
-  ctx: { exclude?: string[]; max?: number; topic?: string; wordType?: string; keepHintFlaws?: boolean } = {},
+  ctx: { exclude?: string[]; max?: number; topic?: string; wordType?: string; keepHintFlaws?: boolean; restrictions?: readonly Restriction[] } = {},
 ): ParsedWords {
   const expected = ctx.topic ? expectedPartsOfSpeech(ctx.topic, ctx.wordType) : null;
   const issues: string[] = [];
@@ -339,7 +342,7 @@ export function parseGeneratedWords(
     }
     const w = coerced.word;
     // AI output must be clean: errors AND letter-only hints are rejected (teachers may still keep one by hand).
-    const problems = validateWord(w).filter((p) => p.severity === "error" || p.code === "letter-only" || p.code === "vague-opening");
+    const problems = validateWord(w, ctx.restrictions).filter((p) => p.severity === "error" || p.code === "letter-only" || p.code === "vague-opening");
     if (problems.length) {
       // A teacher-approved word is never thrown away because of its hints: keep the item and report what needs repair.
       if (ctx.keepHintFlaws && problems.every((p) => p.field === "hints")) {

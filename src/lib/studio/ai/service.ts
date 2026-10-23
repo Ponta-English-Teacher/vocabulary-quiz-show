@@ -1,6 +1,7 @@
 import type { VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
 import { hintProblems, parseGeneratedWords } from "../validation";
+import { restrictionsFor, type Restriction } from "../restrictions";
 import { mockApproved, mockChat, mockGenerate, mockHints, mockReplace } from "./mock";
 import { callOpenAIJson, DEFAULT_MODEL, type FetchLike } from "./openai";
 import { mergeAiCandidates } from "../candidates";
@@ -98,6 +99,8 @@ function runMock(req: StudioRequest, deps: ServiceDeps): StudioData {
 
 async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioData> {
   const cfg = { apiKey: deps.apiKey!, model: deps.model || DEFAULT_MODEL, fetchImpl: deps.fetchImpl };
+  // The teacher's checkable hint restrictions (brief notes, then this request's instruction as the newest word).
+  const restrictions = req.task === "chat" ? [] : restrictionsFor(req.brief.learnerFocus, req.instruction);
 
   switch (req.task) {
     case "chat": {
@@ -131,7 +134,7 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
             }
             throw e;
           }
-          const parsed = parseGeneratedWords((raw as { words?: unknown })?.words, { exclude: found.map((w) => w.word), keepHintFlaws: true });
+          const parsed = parseGeneratedWords((raw as { words?: unknown })?.words, { exclude: found.map((w) => w.word), keepHintFlaws: true, restrictions });
           for (const f of parsed.flawed) flawedNow.set(normalize(f.word), { reason: f.reason, hints: f.hints });
           issues.push(...parsed.issues);
           for (const r of parsed.rejected) if (missing.some((m) => normalize(m) === normalize(r.word))) reasons.set(normalize(r.word), r.reason);
@@ -148,11 +151,18 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
           const flaw = flawedNow.get(normalize(w.word));
           if (!flaw) continue;
           let tried = flaw.reason; // what the next rewrite is told to avoid
+          // A hint that only breaks a teacher restriction is rewritten ALONE: the other hints are kept exactly as they are.
+          const now = hintProblems(w, restrictions);
+          const only = now.length > 0 && now.every((p) => p.code === "restriction") ? [...new Set(now.map((p) => p.hintIndex!))] : null;
           for (let t = 0; t < HINT_REPAIRS; t++) {
             try {
-              const raw = await callOpenAIJson(cfg, hintsPrompt(req.brief, w, `${req.instruction ? `${req.instruction}\n` : ""}Your previous hints were rejected: ${tried} Write three different hints that avoid these problems. The opening hint must be a real situation (who, when, where), and no hint may contain the word "${w.word}" or any part of it.`));
-              const hints = parseHints(raw, w);
-              const bad = hintProblems({ ...w, hints });
+              const ask = only
+                ? `${req.instruction ? `${req.instruction}\n` : ""}Only ${only.length === 1 ? `hint ${only[0] + 1}` : `hints ${only.map((i) => i + 1).join(" and ")}`} must change. These hints are fine and will be kept, so make the new one fit with them: ${JSON.stringify(w.hints.filter((_, i) => !only.includes(i)))}. Problem: ${tried} Write three hints in which ${only.length === 1 ? "that hint avoids" : "those hints avoid"} the problem, and no hint contains the word "${w.word}" or any part of it.`
+                : `${req.instruction ? `${req.instruction}\n` : ""}Your previous hints were rejected: ${tried} Write three different hints that avoid these problems. The opening hint must be a real situation (who, when, where), and no hint may contain the word "${w.word}" or any part of it.`;
+              const raw = await callOpenAIJson(cfg, hintsPrompt(req.brief, w, ask));
+              const fresh = parseHints(raw, w);
+              const hints = only ? w.hints.map((h, i) => (only.includes(i) ? fresh[i] : h)) : fresh;
+              const bad = hintProblems({ ...w, hints }, restrictions);
               if (bad.length) { tried = bad.map((p) => p.message).join(" "); continue; }
               w.hints = hints;
               flawedNow.delete(normalize(w.word));
@@ -187,7 +197,7 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
       for (let attempt = 0; attempt < 2; attempt++) {
         const raw = await callOpenAIJson(cfg, replacePrompt(req.brief, req.current, req.exclude, req.instruction));
         const exclude = [...req.exclude, req.current.word];
-        const parsed = parseGeneratedWords([(raw as { word?: unknown })?.word], { exclude, max: 1, topic: req.brief.topic, wordType: req.brief.wordType });
+        const parsed = parseGeneratedWords([(raw as { word?: unknown })?.word], { exclude, max: 1, topic: req.brief.topic, wordType: req.brief.wordType, restrictions });
         if (parsed.words[0]) return { task: "replace-word", word: parsed.words[0] };
       }
       throw new AiError("malformed", "The AI could not produce a valid replacement. The original word was kept.");
@@ -199,7 +209,7 @@ async function runOpenAI(req: StudioRequest, deps: ServiceDeps): Promise<StudioD
         try {
           const raw = await callOpenAIJson(cfg, hintsPrompt(req.brief, req.word, req.instruction));
           const hints = parseHints(raw, req.word);
-          const bad = hintProblems({ ...req.word, hints });
+          const bad = hintProblems({ ...req.word, hints }, restrictions);
           if (bad.length) throw new AiError("validation", bad.map((p) => p.message).join(" "));
           return { task: "regenerate-hints", hints };
         } catch (e) {
@@ -245,7 +255,7 @@ async function generateFree(
       }
       throw e;
     }
-    const parsed = parseGeneratedWords((raw as { words?: unknown })?.words, { exclude, max: need, topic: req.brief.topic, wordType: req.brief.wordType });
+    const parsed = parseGeneratedWords((raw as { words?: unknown })?.words, { exclude, max: need, topic: req.brief.topic, wordType: req.brief.wordType, restrictions: restrictionsFor(req.brief.learnerFocus, req.instruction) });
     words.push(...parsed.words);
     issues.push(...parsed.issues);
     feedback = parsed.issues.slice(0, 6);

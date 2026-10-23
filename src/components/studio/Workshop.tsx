@@ -14,6 +14,7 @@ import { requestIllustration } from "@/lib/studio/illustrateClient";
 import { SET_SIZE, type Activity, type Brief, type StudioCommand } from "@/lib/studio/types";
 import { ChatPanel } from "./ChatPanel";
 import { SetPanel } from "./SetPanel";
+import { restrictionsFor, withRestrictionNote } from "@/lib/studio/restrictions";
 import { Notice, StorageNotice, type AiStatus } from "./shared";
 
 type ReqOf<T extends StudioData["task"]> = Extract<StudioRequest, { task: T }>;
@@ -247,6 +248,11 @@ export function Workshop({
   };
 
   const runCommand = async (cmd: StudioCommand, brief: Brief) => {
+    // A one-off instruction that contains a checkable restriction is remembered, so it is still enforced when the teacher edits or approves.
+    if ("instruction" in cmd && cmd.instruction) {
+      const focus = withRestrictionNote(actRef.current.brief.learnerFocus, cmd.instruction);
+      if (focus !== actRef.current.brief.learnerFocus) commit(setBrief(actRef.current, { ...actRef.current.brief, learnerFocus: focus }));
+    }
     const set = actRef.current.sets.find((s) => s.id === activeSetId) ?? actRef.current.sets[0];
     if (cmd.type === "generate") return doGenerate(brief, brief.numSets);
     if (!set) return setNotice({ kind: "info", text: "Generate a set first, then I can change it." });
@@ -352,6 +358,7 @@ export function Workshop({
           sets={activity.sets}
           activeId={activeSetId}
           busy={busy}
+          restrictions={restrictionsFor(brief.learnerFocus)}
           busyWordId={busyWordId}
           canGenerate={canGenerate}
           onSelect={(id) => { setActiveSetId(id); setApproveProblems([]); }}

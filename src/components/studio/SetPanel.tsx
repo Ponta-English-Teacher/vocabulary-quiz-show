@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { VocabWord } from "@/data/vocab";
+import type { Restriction } from "@/lib/studio/restrictions";
 import { approvalProblems, levelMix, mixAdvice, setProgress, wordsNeedingHints } from "@/lib/studio/ops";
 import { SET_SIZE, type StudioSet } from "@/lib/studio/types";
 import { ConfirmButton } from "./shared";
@@ -11,6 +12,7 @@ export function SetPanel({
   sets,
   activeId,
   busy,
+  restrictions = [],
   busyWordId,
   canGenerate,
   onSelect,
@@ -35,6 +37,8 @@ export function SetPanel({
   sets: StudioSet[];
   activeId: string | null;
   busy: string | null;
+  /** The teacher's checkable hint restrictions (from the brief). */
+  restrictions?: Restriction[];
   busyWordId: string | null;
   canGenerate: boolean;
   onSelect: (id: string) => void;
@@ -59,7 +63,7 @@ export function SetPanel({
   const [openId, setOpenId] = useState<string | null>(null);
   const set = sets.find((s) => s.id === activeId) ?? sets[0];
   const disabled = !!busy;
-  const live = set ? approvalProblems(set) : [];
+  const live = set ? approvalProblems(set, restrictions) : [];
 
   return (
     <section className="pane pane--sets" aria-labelledby="sets-h">
@@ -95,8 +99,8 @@ export function SetPanel({
           </div>
 
           {(() => {
-            const p = setProgress(set);
-            const hintWords = wordsNeedingHints(set);
+            const p = setProgress(set, restrictions);
+            const hintWords = wordsNeedingHints(set, restrictions);
             if (set.requested === undefined && !p.needCorrection) return null;
             return (
               <div className={`progress ${p.needCorrection ? "progress--bad" : ""}`} role="status" aria-label="Generation progress">

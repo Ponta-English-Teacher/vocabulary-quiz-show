@@ -3,6 +3,7 @@ import { normalize } from "@/lib/answer";
 import { newId } from "./ids";
 import { EMPTY_BRIEF, MIN_SET_WORDS, SET_SIZE, type Activity, type Brief, type MissingItem, type StudioSet } from "./types";
 import { hasErrors, hintProblems, validateWord } from "./validation";
+import { restrictionsFor, type Restriction } from "./restrictions";
 
 /**
  * Pure editing operations on an Activity. Every function returns a NEW activity and
@@ -184,18 +185,20 @@ export function addSet(a: Activity, words: VocabWord[], opts: { requested?: numb
 }
 
 /** Flagged words whose hints are STILL not right. Fixing the hints by hand or by AI clears the flag by itself. */
-export function wordsNeedingHints(set: StudioSet): { word: VocabWord; reasons: string[]; hints: number[] }[] {
-  return (set.flagged ?? []).flatMap((id) => {
-    const w = set.words.find((x) => x.id === id);
-    const problems = w ? hintProblems(w) : [];
-    return w && problems.length ? [{ word: w, reasons: problems.map((p) => p.message), hints: [...new Set(problems.flatMap((p) => (p.hintIndex === undefined ? [] : [p.hintIndex])))] }] : [];
+export function wordsNeedingHints(set: StudioSet, restrictions: readonly Restriction[] = []): { word: VocabWord; reasons: string[]; hints: number[] }[] {
+  // Flagged words are checked in full; any other word is checked only against the teacher's restrictions (so a restriction added
+  // later, or a hand edit that breaks one, is never accepted silently).
+  const flagged = new Set(set.flagged ?? []);
+  return set.words.flatMap((w) => {
+    const problems = flagged.has(w.id) ? hintProblems(w, restrictions) : hintProblems(w, restrictions).filter((p) => p.code === "restriction");
+    return problems.length ? [{ word: w, reasons: problems.map((p) => p.message), hints: [...new Set(problems.flatMap((p) => (p.hintIndex === undefined ? [] : [p.hintIndex])))] }] : [];
   });
 }
 
 /** Counts for the lineup: words the teacher selected, items that are complete and valid, and words that still need correction. */
-export function setProgress(set: StudioSet): { approved: number; written: number; failed: number; needHints: number; valid: number; needCorrection: number } {
+export function setProgress(set: StudioSet, restrictions: readonly Restriction[] = []): { approved: number; written: number; failed: number; needHints: number; valid: number; needCorrection: number } {
   const failed = set.missing?.length ?? 0;
-  const needHints = wordsNeedingHints(set).length;
+  const needHints = wordsNeedingHints(set, restrictions).length;
   return {
     approved: set.requested ?? set.words.length + failed,
     written: set.words.length,
@@ -245,13 +248,13 @@ export function removeSet(a: Activity, setId: string): Activity {
 }
 
 /** Reasons a set cannot be approved yet (empty array = ready). */
-export function approvalProblems(set: StudioSet): string[] {
+export function approvalProblems(set: StudioSet, restrictions: readonly Restriction[] = []): string[] {
   const problems: string[] = [];
   if (set.words.length < MIN_SET_WORDS || set.words.length > SET_SIZE) problems.push(`A set needs ${MIN_SET_WORDS} to ${SET_SIZE} words (this one has ${set.words.length}).`);
   if (set.missing?.length) {
     problems.push(`${set.missing.length} approved word${set.missing.length === 1 ? " has" : "s have"} no item yet: ${set.missing.map((m) => `“${m.word}”`).join(", ")}. Retry ${set.missing.length === 1 ? "it" : "them"} or remove ${set.missing.length === 1 ? "it" : "them"} from the set first.`);
   }
-  for (const f of wordsNeedingHints(set)) {
+  for (const f of wordsNeedingHints(set, restrictions)) {
     problems.push(`“${f.word.word}” still needs its hints corrected (${f.hints.length ? `hint${f.hints.length === 1 ? "" : "s"} ${f.hints.map((h) => h + 1).join(", ")}: ` : ""}${f.reasons.join(" ")}).`);
   }
   const seen = new Set<string>();
@@ -275,7 +278,7 @@ export function reopenSet(a: Activity, setId: string): Activity {
 export function approveSet(a: Activity, setId: string): { activity: Activity; problems: string[] } {
   const set = a.sets.find((s) => s.id === setId);
   if (!set) return { activity: a, problems: ["Set not found."] };
-  const problems = approvalProblems(set);
+  const problems = approvalProblems(set, restrictionsFor(a.brief.learnerFocus));
   if (problems.length) return { activity: a, problems };
   return { activity: mapSet(a, setId, (s) => ({ ...s, status: "approved" })), problems: [] };
 }
