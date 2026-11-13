@@ -150,7 +150,7 @@ describe("demo mode follows the same Giver/Taker distinction", () => {
     const taker = renderToStaticMarkup(h(TakerRound, { state: redactForTaker(s), dispatch: () => undefined }));
     expect(taker).not.toContain(word.hints[0]);
     expect(taker).not.toContain("Opening hint");
-    expect(taker).toContain("Ask your partner questions to find out the word.");
+    expect(taker).toContain("Listen to your partner and guess the word.");
   });
   it("extra hints still reach the Taker once the Giver reveals them, labelled as extra hints", () => {
     let s = start();

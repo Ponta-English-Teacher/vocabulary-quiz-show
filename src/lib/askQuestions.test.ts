@@ -105,7 +105,8 @@ describe("Giver/Taker privacy and both modes", () => {
     const s = start();
     const w = currentWord(s)!;
     const html = renderToStaticMarkup(h(TakerRound, { state: redactForTaker(s), dispatch: () => undefined }));
-    expect(html).toContain("How does the person feel?");
+    expect(html).not.toContain("How does the person feel?"); // the Taker screen no longer shows suggested questions
+    expect(html).not.toContain("tap for another idea");
     expect(html).not.toContain(WHERE);
     for (const secret of [w.word, w.hints[0], w.meaning, w.example, w.giverInfo!.use!, ...(w.ja ?? [])].filter(Boolean)) {
       expect(html).not.toContain(secret);
@@ -140,7 +141,8 @@ describe("Giver/Taker privacy and both modes", () => {
       expect(json).not.toContain(secret);
     }
     const html = renderToStaticMarkup(h(TakerRound, { state: r.view.game!, dispatch: () => undefined }));
-    expect(html).toContain("How does the person feel?");
+    expect(html).not.toContain("How does the person feel?"); // the Taker screen no longer shows suggested questions
+    expect(html).not.toContain("tap for another idea");
     expect(html).not.toContain(WHERE);
   });
 });

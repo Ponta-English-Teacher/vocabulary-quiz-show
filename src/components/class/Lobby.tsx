@@ -123,7 +123,7 @@ export function Roles({ view, act, studyHref }: { view: ClassView; act: (a: Clie
               I&apos;ll be the Taker
             </button>
           </div>
-          <p className="note">The Giver sees the word and explains it aloud. The Taker asks questions and guesses. You swap after every word.</p>
+          <p className="note">The Giver sees the word and explains it aloud. The Taker listens and guesses. You swap after every word.</p>
         </>
       ) : p.youProposed ? (
         <>

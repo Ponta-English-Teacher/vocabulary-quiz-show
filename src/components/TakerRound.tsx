@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { currentWord, type Feedback, type GameAction, type GameState } from "@/lib/game";
-import { questionsFor } from "@/lib/askQuestions";
 import { FREE_HINTS, takerPointsFor } from "@/lib/scoring";
 import { PointsMeter } from "./PointsMeter";
 import { SkipButton } from "./SkipButton";
@@ -13,13 +12,13 @@ function feedbackText(fb: Feedback | null, lang: Feedback["lang"]): string | nul
   if (!fb || fb.lang !== lang) return null;
   switch (fb.kind) {
     case "wrong":
-      return lang === "ja" ? "That isn't the Japanese word we're looking for — keep asking questions, or try again." : "Not quite — keep asking questions!";
+      return lang === "ja" ? "That isn't the Japanese word we're looking for — keep listening, or try again." : "Not quite — keep listening and try again!";
     case "close":
       return "So close! Check the spelling and try again.";
     case "not-japanese":
       return "Please type your answer in Japanese in this box. (To answer in English, go back.)";
     case "no-ja-credit":
-      return "This word has no approved Japanese answer, so it can't earn points in Japanese. Keep asking questions, or answer in English.";
+      return "This word has no approved Japanese answer, so it can't earn points in Japanese. Keep listening, or answer in English.";
   }
 }
 
@@ -30,8 +29,6 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
   const [jaText, setJaText] = useState("");
   // Which answer box is open. English is the default; the Japanese box opens only from the "not in English" button.
   const [mode, setMode] = useState<"en" | "ja">("en");
-  const [tip, setTip] = useState(0);
-  const questions = questionsFor(word ?? { partOfSpeech: "noun" });
   const inputRef = useRef<HTMLInputElement>(null);
   const jaInputRef = useRef<HTMLInputElement>(null);
   const fb = state.feedback;
@@ -74,7 +71,7 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
         </h2>
         <PointsMeter hintsUsed={state.hintsUsed} showJapanese={hasJapanese} illustration={state.illustrationUsed} />
         <p className="note">
-          {state.hintsUsed === 0 ? "Questions are free — ask as many as you like." : `${state.hintsUsed} extra hint${state.hintsUsed === 1 ? "" : "s"} used`}
+          {state.hintsUsed === 0 ? "Questions to your partner are free." : `${state.hintsUsed} extra hint${state.hintsUsed === 1 ? "" : "s"} used`}
         </p>
       </section>
 
@@ -89,14 +86,9 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
         </section>
       ) : null}
 
-      <section className="ask">
-        <h3 className="label">Ask your partner — out loud!</h3>
-        <p className="note ask__task">Ask your partner questions to find out the word.</p>
-        <button type="button" className="ask__prompt" onClick={() => setTip((t) => (t + 1) % questions.length)}>
-          “{questions[tip % questions.length]}”
-          <span className="ask__more">tap for another idea</span>
-        </button>
-      </section>
+      <p className="rule-banner rule-banner--taker" role="note">
+        <b>Listen to your partner and guess the word.</b>
+      </p>
 
       {mode === "en" ? (
         <>
@@ -131,14 +123,12 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
             <p className={`feedback ${fb?.lang === "en" ? `feedback--${fb.kind}` : ""}`} role="status" aria-live="polite">
               {feedbackText(fb, "en")}
             </p>
-            <p className="note">Type your answer. (Your phone keyboard&apos;s own microphone key works too, if it has one.)</p>
-          </form>
+                      </form>
 
           <div className="notenglish">
-            <button type="button" className="btn btn--ja" onClick={openJapanese}>
+            <button type="button" className="btn btn--link btn--ja-link" onClick={openJapanese}>
               I know it, but not in English!
             </button>
-            <p className="note">Answer in Japanese for half the points.</p>
           </div>
         </>
       ) : (
@@ -156,7 +146,7 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
           <p className="note">
             {hasJapanese
               ? `A correct Japanese answer earns ${jaPoints} points (half) and ends the round. You'll then learn the English word.`
-              : "This word has no approved Japanese answer, so Japanese can't earn points. Keep asking questions, or go back and answer in English."}
+              : "This word has no approved Japanese answer, so Japanese can't earn points. Keep listening, or go back and answer in English."}
           </p>
           <div key={fb?.lang === "ja" ? fb.n : 0} className={`answer__box ${fb?.lang === "ja" ? `is-${fb.kind === "wrong" ? "wrong" : "close"}` : ""}`}>
             <input

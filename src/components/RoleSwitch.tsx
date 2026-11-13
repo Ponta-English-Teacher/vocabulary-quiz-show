@@ -25,7 +25,7 @@ export function RoleSwitch({ state, onContinue, you }: { state: GameState; onCon
         <div className="switch__row switch__row--taker">
           <span className="role-tag role-tag--taker">Taker</span>
           <span className="switch__name">{taker.name}</span>
-          <span className="switch__desc">asks questions &amp; guesses</span>
+          <span className="switch__desc">listens &amp; guesses</span>
         </div>
       </div>
 
