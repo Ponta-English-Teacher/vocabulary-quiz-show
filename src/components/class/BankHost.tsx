@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { clampPlayCount } from "@/lib/playCount";
 import { createClassLink } from "@/lib/class/createLink";
 import type { ImportReport } from "@/lib/studio/cqsImport";
-import { bankCategories, bankFromText, bankLevels, clearBank, convertBank, DEFAULT_GAME_WORDS, filterBank, loadBank, MAX_GAME_WORDS, pickForGame, type SavedBank } from "@/lib/studio/cqsBank";
+import { bankCategories, bankFromText, bankLevels, clearBank, convertBank, DEFAULT_GAME_WORDS, evaluateSync, filterBank, loadBank, markSynced, MAX_GAME_WORDS, pickForGame, saveBank, type SavedBank, type SyncEvaluation } from "@/lib/studio/cqsBank";
+import { requestLatestBank } from "@/lib/studio/cqsSync";
 import { getBrowserStorage } from "@/lib/studio/storage";
 import { QrCode } from "../QrCode";
 import { TeacherPasscodeForm } from "../TeacherPasscodeForm";
@@ -28,6 +29,8 @@ export function BankHost() {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [pending, setPending] = useState<Extract<SyncEvaluation, { ok: true }> | null>(null);
 
   useEffect(() => {
     setBank(loadBank(getBrowserStorage()));
@@ -59,6 +62,7 @@ export function BankHost() {
       setError(`${r.error} Your previous bank (if any) is unchanged.`);
       return;
     }
+    setPending(null);
     setBank(r.bank);
     setCefr("all");
     setCategory("all");
@@ -66,6 +70,57 @@ export function BankHost() {
     setLinks(null);
     setNotice(r.remembered ? "Question bank loaded and remembered in this browser." : "Question bank loaded, but this browser would not remember it: choose the file again next time.");
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const when = (iso?: string) => {
+    const d = iso ? new Date(iso) : null;
+    return d && !Number.isNaN(d.getTime()) ? d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "an unknown time";
+  };
+
+  const accept = (incoming: SavedBank) => {
+    const remembered = saveBank(getBrowserStorage(), incoming);
+    setBank(incoming);
+    setCefr("all");
+    setCategory("all");
+    setChosen(new Set());
+    setLinks(null);
+    setPending(null);
+    const c = convertBank(incoming).counts;
+    setNotice(`Synced ${c.total} approved questions from Classroom Quiz Show: ${c.ready} ready, ${c.flagged} flagged, ${c.skipped} skipped.${remembered ? "" : " This browser would not remember them: sync again next time."}`);
+  };
+
+  const sync = async () => {
+    setSyncing(true);
+    setError(null);
+    setNotice(null);
+    setPending(null);
+    const r = await requestLatestBank(bank?.origin === "sync" ? bank.etag : undefined);
+    setSyncing(false);
+    const keep = bank ? ` Still using your saved bank${bank.origin === "sync" ? ` (last synced ${when(bank.syncedAt)})` : ""}.` : " You can choose a file instead.";
+    if (r.kind === "error") {
+      setError(`Sync failed: ${r.message}${keep}`);
+      return;
+    }
+    if (r.kind === "unchanged") {
+      if (!bank) {
+        setError(`Sync failed: nothing was received.${keep}`);
+        return;
+      }
+      const m = markSynced(getBrowserStorage(), bank);
+      setBank(m.bank);
+      setNotice(`Already up to date (checked ${when(m.bank.syncedAt)}).`);
+      return;
+    }
+    const ev = evaluateSync(bank, r.text, r.etag);
+    if (!ev.ok) {
+      setError(`Sync failed: ${ev.error}${keep}`);
+      return;
+    }
+    if (ev.needsConfirm) {
+      setPending(ev);
+      return;
+    }
+    accept(ev.incoming);
   };
 
   const forget = () => {
@@ -109,22 +164,47 @@ export function BankHost() {
 
   return (
     <div className="bankhost">
+      {access.status === "needs" ? (
+        <div className="bankhost__unlock">
+          <p className="note">Enter the teacher passcode to sync the bank and start games.</p>
+          <TeacherPasscodeForm error={access.error} busy={access.busy} onSubmit={access.submit} />
+        </div>
+      ) : access.status === "locked" ? (
+        <p className="note" role="alert">Teacher tools are locked: no teacher passcode is configured on this server.</p>
+      ) : null}
       <h3 className="bankhost__step">1. Question bank</h3>
+      <button type="button" className="btn btn--hero" onClick={sync} disabled={syncing || !access.allowed}>
+        {syncing ? "Syncing…" : "Sync Latest Bank"}
+      </button>
+      <p className="note">Gets the latest approved questions straight from Classroom Quiz Show. Your saved bank is kept if anything goes wrong.</p>
+      {pending ? (
+        <div className="bankhost__confirm" role="alertdialog" aria-label="Confirm a smaller bank">
+          <p className="feedback feedback--wrong">
+            The new bank has only <b>{pending.readyAfter}</b> ready questions, down from <b>{pending.readyBefore}</b> (more than half fewer). That may be a mistake. Replace your saved bank?
+          </p>
+          <div className="bankhost__actions">
+            <button type="button" className="btn btn--small" onClick={() => accept(pending.incoming)}>Replace anyway</button>
+            <button type="button" className="btn btn--small btn--ghost" onClick={() => { setPending(null); setNotice("Kept your saved bank. The smaller one was not used."); }}>Keep my saved bank</button>
+          </div>
+        </div>
+      ) : null}
       {!bank || !report ? (
         <>
-          <p className="note">Choose the Classroom Quiz Show question-bank file (<code>.json</code>). It is remembered in this browser, so you only need to do this once. It is read here and never uploaded or changed.</p>
-          {fileInput("Choose question-bank file", true)}
+          <p className="note">No question bank saved in this browser yet. Press Sync Latest Bank, or choose an exported file instead.</p>
+          {fileInput("Or choose a file instead…", false)}
         </>
       ) : (
         <>
           <p className="bankhost__bank">
-            <b>{bank.fileName}</b> · {report.counts.total} questions
+            <b>{bank.origin === "sync" ? "Classroom Quiz Show (synced)" : bank.fileName}</b>
+            <span>{bank.origin === "sync" ? `Last synced ${when(bank.syncedAt)}` : `Loaded from a file ${when(bank.savedAt)} (not synced)`}</span>
+            <span>{report.counts.total} questions in this bank</span>
             <span className="bankhost__counts" role="status">
               <span className="c-good">{report.counts.ready} ready</span> · <span className="c-gold">{report.counts.flagged} flagged</span> · <span>{report.counts.skipped} skipped</span>
             </span>
           </p>
           <div className="bankhost__actions">
-            {fileInput("Replace bank…", false)}
+            {fileInput("Replace from a file…", false)}
             <button type="button" className="btn btn--small btn--ghost" onClick={forget}>Remove saved bank</button>
           </div>
           <details className="fold">
@@ -199,15 +279,9 @@ export function BankHost() {
           {available > MAX_GAME_WORDS ? <p className="note">A game can have at most {MAX_GAME_WORDS} questions.</p> : null}
 
           <h3 className="bankhost__step">4. Start</h3>
-          {access.status === "needs" ? (
-            <TeacherPasscodeForm error={access.error} busy={access.busy} onSubmit={access.submit} />
-          ) : access.status === "locked" ? (
-            <p className="note" role="alert">Hosting is locked: no teacher passcode is configured on this server.</p>
-          ) : (
-            <button type="button" className="btn btn--hero" onClick={start} disabled={busy || available < 1 || access.status === "loading"}>
-              {busy ? "Creating…" : "Start Pair Game"}
-            </button>
-          )}
+          <button type="button" className="btn btn--hero" onClick={start} disabled={busy || available < 1 || !access.allowed}>
+            {busy ? "Creating…" : "Start Pair Game"}
+          </button>
         </>
       )}
       {error ? <p className="feedback feedback--wrong" role="alert">{error}</p> : null}

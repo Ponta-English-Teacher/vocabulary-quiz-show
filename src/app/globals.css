@@ -761,3 +761,7 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .welcome .bulbs { display: none; }
 .welcome .tagline { font-size: 1rem; }
 .bankhost__actions > * { flex: 1 1 8rem; }
+.bankhost__unlock { display: grid; gap: 0.5rem; padding: 0.7rem; border: 1px solid var(--line); border-radius: 0.8rem; }
+.bankhost__confirm { display: grid; gap: 0.5rem; padding: 0.7rem; border: 2px solid rgb(255 201 71 / 0.7); border-radius: 0.8rem; background: rgb(255 201 71 / 0.08); }
+.bankhost__bank > span { display: block; font: 400 0.9rem/1.4 var(--serif); color: var(--ink-dim); }
+.bankhost__bank > .bankhost__counts { color: var(--ink); }
