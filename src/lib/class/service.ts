@@ -213,7 +213,7 @@ export class ClassService {
       }
     };
     let table = await read();
-    let still = lacking.filter((w) => !table[normalize(w.word)]?.length);
+    let still = lacking.filter((w) => !w.source && !table[normalize(w.word)]?.length); // imported words are never sent to AI
     if (!still.length || !this.opts.translator) return { table, translating: false };
     if (await this.kv.get(studyJaCoolKey(activity.id))) return { table, translating: false };
     if ((Number(await this.kv.get(studyJaTriesKey(activity.id))) || 0) >= MAX_STUDY_TRANSLATE_TRIES) return { table, translating: false };
@@ -222,7 +222,7 @@ export class ClassService {
     try {
       await this.kv.incr(studyJaTriesKey(activity.id), ACTIVITY_TTL);
       table = await read(); // someone may have finished just before we took the lock
-      still = lacking.filter((w) => !table[normalize(w.word)]?.length);
+      still = lacking.filter((w) => !w.source && !table[normalize(w.word)]?.length);
       if (still.length) {
         try {
           const got = await this.opts.translator(still.map((w) => ({ word: w.word, partOfSpeech: w.partOfSpeech, meaning: w.meaning })));

@@ -134,11 +134,13 @@ export function GiverRound({
 
       {!state.illustrationUsed && onRequestIllustration ? <IllustrationRequest onRequest={onRequestIllustration} /> : null}
 
-      <details className="fold">
-        <summary>Meaning and example</summary>
-        <p className="meaning__text">{word.meaning}</p>
-        <p className="meaning__eg">“{word.example}”</p>
-      </details>
+      {word.meaning || word.example ? (
+        <details className="fold">
+          <summary>Meaning and example</summary>
+          {word.meaning ? <p className="meaning__text">{word.meaning}</p> : null}
+          {word.example ? <p className="meaning__eg">“{word.example}”</p> : null}
+        </details>
+      ) : null}
 
       <details className="fold">
         <summary>Words that help you explain</summary>

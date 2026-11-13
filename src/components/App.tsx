@@ -12,6 +12,7 @@ import { getBrowserStorage, loadActivities } from "@/lib/studio/storage";
 /** Top-level switch between the quiz show and the Teacher Studio. */
 export function App() {
   const [screen, setScreen] = useState<"game" | "studio">("game");
+  const [studioStart, setStudioStart] = useState<"home" | "import">("home");
   const [saved, setSaved] = useState<VocabSet[]>([]);
   const [extra, setExtra] = useState<VocabSet | null>(null);
   const [selectedId, setSelectedId] = useState(SAMPLE_SET.id);
@@ -34,6 +35,8 @@ export function App() {
     <Stage tone="studio">
       <TeacherGate onBack={() => { reload(); setGameKey((k) => k + 1); setScreen("game"); }}>
       <Studio
+        key={studioStart}
+        startAt={studioStart === "import" ? "import" : undefined}
         onExit={() => { reload(); setGameKey((k) => k + 1); setScreen("game"); }}
         onPlay={(set) => {
           setExtra(set);
@@ -51,7 +54,8 @@ export function App() {
       sets={options}
       selectedId={options.some((s) => s.id === selectedId) ? selectedId : SAMPLE_SET.id}
       onSelectSet={setSelectedId}
-      onOpenStudio={() => setScreen("studio")}
+      onOpenStudio={() => { setStudioStart("home"); setScreen("studio"); }}
+      onOpenImport={() => { setStudioStart("import"); setScreen("studio"); }}
     />
   );
 }

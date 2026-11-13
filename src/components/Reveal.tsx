@@ -37,8 +37,8 @@ export function Reveal({ state, onNext }: { state: GameState; onNext: () => void
         </div>
       ) : null}
       <p className="reveal__repeat">{solved ? "Say it out loud in English before you move on!" : "Say the word out loud together."}</p>
-      <p className="reveal__meaning">{word.meaning}</p>
-      <p className="reveal__eg">“{word.example}”</p>
+      {word.meaning ? <p className="reveal__meaning">{word.meaning}</p> : null}
+      {word.example ? <p className="reveal__eg">“{word.example}”</p> : null}
 
       {solved ? (
         <dl className="awards">

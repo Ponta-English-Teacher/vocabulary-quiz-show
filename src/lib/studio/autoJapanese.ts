@@ -24,7 +24,7 @@ export function missingStudyJapanese(activities: Activity[]): WordToTranslate[] 
       if (s.status !== "approved") continue;
       for (const w of s.words) {
         const key = normalize(w.word);
-        if (hasJapanese(w) || seen.has(key)) continue;
+        if (hasJapanese(w) || seen.has(key) || w.source) continue; // imported words are never sent to AI automatically
         seen.add(key);
         out.push({ word: w.word, partOfSpeech: w.partOfSpeech, meaning: w.meaning });
       }

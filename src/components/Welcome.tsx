@@ -8,6 +8,7 @@ import { play } from "@/lib/sound";
 import { clampPlayCount, DEFAULT_PLAY_COUNT } from "@/lib/playCount";
 import { PlayCount } from "./PlayCount";
 import { HostClass } from "./class/HostClass";
+import { BankHost } from "./class/BankHost";
 
 export function Welcome({
   onStart,
@@ -15,12 +16,14 @@ export function Welcome({
   selectedId,
   onSelectSet,
   onOpenStudio,
+  onOpenImport,
 }: {
   onStart: (names: [string, string], count: number) => void;
   sets: VocabSet[];
   selectedId: string;
   onSelectSet: (id: string) => void;
   onOpenStudio: () => void;
+  onOpenImport?: () => void;
 }) {
   const [a, setA] = useState("");
   const [b, setB] = useState("");
@@ -43,72 +46,88 @@ export function Welcome({
       </div>
 
       <div className="welcome__form">
-        {sets.length > 1 ? (
-          <label className="field">
-            <span className="field__label">Word set</span>
-            <select className="setselect" value={selectedId} onChange={(e) => onSelectSet(e.target.value)}>
-              {sets.map((s) => (
-                <option key={s.id} value={s.id}>{s.title}</option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-
         <section className="mode mode--class" aria-labelledby="mode-class">
-          <h2 id="mode-class" className="mode__title"><span className="mode__badge">Classroom mode</span> Two phones</h2>
-          <p className="note">
-            Each student plays on their own phone with a private screen: one is the Giver, the other is the Taker.
-            Students scan the teacher&apos;s QR code, then enter a name and a group number.
-          </p>
-          <HostClass />
-          <button type="button" className="btn btn--studio" onClick={onOpenStudio}>
-            Teacher Studio
-          </button>
+          <h2 id="mode-class" className="mode__title">Start a Pair Game</h2>
+          <p className="note">Choose your question bank, pick a level and category, and start. Students scan the QR code on their own phones and play in pairs: one Giver, one Taker.</p>
+          <BankHost />
         </section>
 
-        <form
-          className="mode mode--demo"
-          aria-labelledby="mode-demo"
-          onSubmit={(e) => {
-            e.preventDefault();
-            play("tap");
-            onStart([a, b], playCount);
-          }}
-        >
-          <h2 id="mode-demo" className="mode__title"><span className="mode__badge mode__badge--demo">Demo mode</span> One screen</h2>
-          <p className="note">Try the game on this one screen — both roles share it. Not for class use: the Taker could see the Giver&apos;s screen.</p>
-          <label className="field">
-            <span className="field__label">Contestant 1</span>
-            <input
-              value={a}
-              onChange={(e) => setA(e.target.value)}
-              maxLength={MAX_NAME_LENGTH}
-              placeholder="Player 1"
-              autoComplete="off"
-              autoCapitalize="words"
-              enterKeyHint="next"
-            />
-          </label>
-          <label className="field">
-            <span className="field__label">Contestant 2</span>
-            <input
-              value={b}
-              onChange={(e) => setB(e.target.value)}
-              maxLength={MAX_NAME_LENGTH}
-              placeholder="Player 2"
-              autoComplete="off"
-              autoCapitalize="words"
-              enterKeyHint="go"
-            />
-          </label>
-          <PlayCount available={available} value={playCount} onChange={setCount} />
-          <button type="submit" className="btn btn--hero">Start demo game</button>
-        </form>
+        <details className="more">
+          <summary>Advanced / Legacy Studio</summary>
+          <div className="more__body">
+            <div className="more__tools">
+              <p className="note">Not needed to play. The earlier tools are still here, with all your saved activities.</p>
+              <button type="button" className="btn btn--studio" onClick={onOpenStudio}>
+                Teacher Studio (Writers&apos; Room, sets, AI)
+              </button>
+              {onOpenImport ? (
+                <button type="button" className="btn btn--ghost" onClick={onOpenImport}>
+                  Import a question bank into saved sets
+                </button>
+              ) : null}
+            </div>
+
+            <section className="mode" aria-labelledby="mode-legacy">
+              <h2 id="mode-legacy" className="mode__title">Host a saved set (old way)</h2>
+              <p className="note">Pair game from a Studio set or the built-in sample.</p>
+              <HostClass />
+            </section>
+
+            <form
+              className="mode mode--demo"
+              aria-labelledby="mode-demo"
+              onSubmit={(e) => {
+                e.preventDefault();
+                play("tap");
+                onStart([a, b], playCount);
+              }}
+            >
+              <h2 id="mode-demo" className="mode__title"><span className="mode__badge mode__badge--demo">Demo mode</span> One screen</h2>
+              <p className="note">Try the game on this one screen — both roles share it. Not for class use: the Taker could see the Giver&apos;s screen.</p>
+              {sets.length > 1 ? (
+                <label className="field">
+                  <span className="field__label">Word set</span>
+                  <select className="setselect" value={selectedId} onChange={(e) => onSelectSet(e.target.value)}>
+                    {sets.map((s) => (
+                      <option key={s.id} value={s.id}>{s.title}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <label className="field">
+                <span className="field__label">Contestant 1</span>
+                <input
+                  value={a}
+                  onChange={(e) => setA(e.target.value)}
+                  maxLength={MAX_NAME_LENGTH}
+                  placeholder="Player 1"
+                  autoComplete="off"
+                  autoCapitalize="words"
+                  enterKeyHint="next"
+                />
+              </label>
+              <label className="field">
+                <span className="field__label">Contestant 2</span>
+                <input
+                  value={b}
+                  onChange={(e) => setB(e.target.value)}
+                  maxLength={MAX_NAME_LENGTH}
+                  placeholder="Player 2"
+                  autoComplete="off"
+                  autoCapitalize="words"
+                  enterKeyHint="go"
+                />
+              </label>
+              <PlayCount available={available} value={playCount} onChange={setCount} />
+              <button type="submit" className="btn btn--hero">Start demo game</button>
+            </form>
+          </div>
+        </details>
       </div>
 
       <ol className="howto">
         <li><span><b>Giver</b> sees the word and an opening hint (free, Giver only) and explains it — out loud, in their own words, never reading it.</span></li>
-        <li><span><b>Taker</b> asks as many questions as they like, then types or says a guess. Know it but not in English? Answer in Japanese for half the points.</span></li>
+        <li><span><b>Taker</b> listens, then types a guess. Know it but not in English? Answer in Japanese for half the points.</span></li>
         <li><span>Extra hints cost points. Swap roles after every word.</span></li>
       </ol>
     </main>

@@ -85,3 +85,14 @@ Illustrations are **not** shown automatically and nothing is drawn in advance. T
 - the picture is sent only to the Giver's phone, only for the word in play, only after the request. The Taker only learns that the word is now worth less.
 
 In demo mode (one screen, no server room) the same button uses a picture made in Studio, or the teacher-protected Studio route. Teacher Studio can still pre-draw pictures ("Draw picture (AI)") so they can be reused without a second image call; they are never shown without the request. `OPENAI_IMAGES_URL` (server env, for tests only) replaces the OpenAI images endpoint.
+
+
+## Starting a pair game, and importing Classroom Quiz Show questions
+- **Start page:** choose a vocabulary set → number of words (default 10) → **Start Pair Game** → join link and QR code. Teacher Studio (Writers' Room, editing, AI), **Import from Classroom Quiz Show** and Demo mode are under "More options".
+- **Import** (`src/lib/studio/cqsImport.ts`, `components/studio/CqsImport.tsx`): choose a Classroom Quiz Show export (`classroom-quiz-show/questions`, version 1) on this computer. It is read in the browser only: no network, database or AI, and the file is never changed. Only approved questions are imported.
+  - answer → target word (leading a/an/the dropped; the full answer stays accepted); CEFR level and category are kept; clues are tried easiest first (chunk 4 → 1), a clue containing the word is left out, and the first three clean clues become hints 1–3 (hint 1 is the free opening hint).
+  - A preview lists **ready**, **flagged** (names, titles, accents/digits, picture clues, … — the teacher decides) and **skipped** questions with reasons. Chosen words are saved as a NEW activity of approved sets (≤10 words each, grouped by level and category); existing activities are never touched, and a question already imported is skipped next time.
+  - Classroom Quiz Show has no definitions, examples or Japanese, so imported words have none (`source: "classroom-quiz-show"` marks them; nothing is invented and they are never sent to AI automatically).
+
+## Teacher page: question bank → Start Pair Game (no Studio needed)
+The main page (`components/class/BankHost.tsx`) is: choose the Classroom Quiz Show JSON bank → level and category → number of questions → **Start Pair Game** → QR code. The bank is remembered in this browser (`vqs.cqsBank.v1`, separate from saved activities); "Replace bank" and "Remove saved bank" manage it. Ready questions are used by default; flagged ones only when ticked. The chosen words go to the existing `POST /api/class` (`lib/class/createLink.ts`), so the Giver–Taker engine, scoring and roles are unchanged. Teacher Studio, saved activities, the old "host a saved set" and Demo mode are under **Advanced / Legacy Studio**.

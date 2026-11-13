@@ -67,7 +67,7 @@ export function StudyList({ title, words, back, pending = false }: { title: stri
               <SpeakButton text={w.word} id={`study-word-${i}`} label={`the word ${w.word}`} variant="icon" />
               <span className="study__pos">{w.partOfSpeech}</span>
             </div>
-            <p className="study__def">{w.meaning}</p>
+            {w.meaning ? <p className="study__def">{w.meaning}</p> : null}
             <StudyJapanese ja={w.ja} hidden={!shown.has(i)} onShow={() => flip(i, true)} onHide={() => flip(i, false)} pending={pending} />
             {w.example ? (
               <p className="study__ex">

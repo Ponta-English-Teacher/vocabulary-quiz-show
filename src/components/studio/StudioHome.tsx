@@ -21,6 +21,7 @@ export function StudioHome({
   message,
   onDismissMessage,
   onNew,
+  onImport,
   onOpen,
   onDuplicate,
   onDelete,
@@ -36,6 +37,7 @@ export function StudioHome({
   message: { kind: "error" | "info"; text: string } | null;
   onDismissMessage: () => void;
   onNew: () => void;
+  onImport?: () => void;
   onOpen: (a: Activity) => void;
   onDuplicate: (a: Activity) => void;
   onDelete: (a: Activity) => void;
@@ -46,7 +48,10 @@ export function StudioHome({
     <section className="studio-home" aria-labelledby="home-title">
       <div className="studio-head">
         <h2 id="home-title" className="studio-h">Library & activities</h2>
-        <button type="button" className="btn btn--hero btn--inline" onClick={onNew}>New activity</button>
+        <div className="row">
+          {onImport ? <button type="button" className="btn btn--ghost btn--inline" onClick={onImport}>Import from Classroom Quiz Show</button> : null}
+          <button type="button" className="btn btn--hero btn--inline" onClick={onNew}>New activity</button>
+        </div>
       </div>
 
       {message ? <Notice kind={message.kind} onClose={onDismissMessage}>{message.text}</Notice> : null}

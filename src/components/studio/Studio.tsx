@@ -12,11 +12,12 @@ import { deleteLibraryList, libraryLists } from "@/lib/studio/library";
 import { AiBadge, type AiStatus } from "./shared";
 import { StudioHome } from "./StudioHome";
 import { Workshop } from "./Workshop";
+import { CqsImport } from "./CqsImport";
 
-type View = { kind: "home" } | { kind: "workshop"; activity: Activity; key: number; setId?: string };
+type View = { kind: "home" } | { kind: "import" } | { kind: "workshop"; activity: Activity; key: number; setId?: string };
 
-export function Studio({ onExit, onPlay }: { onExit: () => void; onPlay: (set: VocabSet) => void }) {
-  const [view, setView] = useState<View>({ kind: "home" });
+export function Studio({ onExit, onPlay, startAt }: { onExit: () => void; onPlay: (set: VocabSet) => void; startAt?: "import" }) {
+  const [view, setView] = useState<View>(startAt === "import" ? { kind: "import" } : { kind: "home" });
   const [activities, setActivities] = useState<Activity[]>([]);
   const [skipped, setSkipped] = useState(0);
   const [storageOk, setStorageOk] = useState(true);
@@ -66,7 +67,12 @@ export function Studio({ onExit, onPlay }: { onExit: () => void; onPlay: (set: V
         </div>
       </header>
 
-      {view.kind === "home" ? (
+      {view.kind === "import" ? (
+        <CqsImport
+          onBack={() => { refresh(); setView({ kind: "home" }); }}
+          onSaved={(text) => { setMessage({ kind: "info", text }); refresh(); setView({ kind: "home" }); }}
+        />
+      ) : view.kind === "home" ? (
         <StudioHome
           activities={activities}
           library={libraryLists(activities)}
@@ -81,6 +87,7 @@ export function Studio({ onExit, onPlay }: { onExit: () => void; onPlay: (set: V
           message={message}
           onDismissMessage={() => setMessage(null)}
           onNew={() => open(createActivity())}
+          onImport={() => setView({ kind: "import" })}
           onOpen={open}
           onPlay={playActivity}
           onDuplicate={(a) => {

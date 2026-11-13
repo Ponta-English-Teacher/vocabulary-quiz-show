@@ -24,11 +24,13 @@ export function Game({
   selectedId,
   onSelectSet,
   onOpenStudio,
+  onOpenImport,
 }: {
   sets: VocabSet[];
   selectedId: string;
   onSelectSet: (id: string) => void;
   onOpenStudio: () => void;
+  onOpenImport?: () => void;
 }) {
   const activeSet = sets.find((s) => s.id === selectedId) ?? sets[0];
   // DEMO MODE: a local, in-memory transport. A paired-device transport would slot in here.
@@ -74,6 +76,7 @@ export function Game({
             selectedId={activeSet.id}
             onSelectSet={onSelectSet}
             onOpenStudio={onOpenStudio}
+            onOpenImport={onOpenImport}
             onStart={(names, count) => dispatch({ type: "START", names, words: selectWords(activeSet.words, count) })}
           />
         ) : null}

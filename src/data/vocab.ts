@@ -66,6 +66,13 @@ export interface VocabWord {
    * Never used for scoring and never sent to a player's phone during a game (the game strips it when it starts).
    */
   studyJa?: string[];
+  /**
+   * Where the word came from, when it was imported from another app's export. Imported words may have an EMPTY `meaning` and `example`
+   * (nothing is invented for them) and are never sent to AI for automatic translation.
+   */
+  source?: "classroom-quiz-show";
+  /** The id of the question in the source export (used to skip a question that was already imported). */
+  sourceId?: string;
 }
 
 /** Giver-only support for explaining a word naturally. Every field is optional and adapts to the kind of word. */

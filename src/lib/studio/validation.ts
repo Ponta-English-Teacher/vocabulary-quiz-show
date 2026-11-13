@@ -36,6 +36,9 @@ export function coerceIllustration(raw: unknown, allowMarker = false): { src: st
   return isIllustrationSrc(r.src) ? { src: r.src, ...(alt ? { alt } : {}) } : undefined;
 }
 
+/** Words imported from the Classroom Quiz Show bank carry this marker; they may lack a definition and an example. */
+export const IMPORT_SOURCE = "classroom-quiz-show" as const;
+
 export interface WordIssue {
   /** Machine-readable reason, where one matters (e.g. AI output with letter-only hints is rejected). */
   code?: "letter-only" | "too-short" | "vague-opening" | "no-japanese" | "no-giver-info" | "restriction";
@@ -140,11 +143,17 @@ export function validateWord(w: VocabWord, restrictions: readonly Restriction[] 
   if (!w.category.trim()) err("category", "Category is empty.");
   else if (leaksTarget(w, w.category)) err("category", "The category gives away the word (the Taker can see it).");
 
-  if (!w.meaning.trim()) err("meaning", "Definition is empty.");
+  if (!w.meaning.trim()) {
+    if (w.source === IMPORT_SOURCE) warn("meaning", "No definition (imported words have none; nothing was invented).");
+    else err("meaning", "Definition is empty.");
+  }
   else if (leaksTarget(w, w.meaning)) warn("meaning", "The definition contains the target word — the Giver would have to avoid reading it.");
   if (w.meaning.length > LIMITS.meaning) err("meaning", `Definition is longer than ${LIMITS.meaning} characters.`);
 
-  if (!w.example.trim()) err("example", "Example sentence is empty.");
+  if (!w.example.trim()) {
+    if (w.source === IMPORT_SOURCE) warn("example", "No example sentence (imported words have none; nothing was invented).");
+    else err("example", "Example sentence is empty.");
+  }
   if (w.example.length > LIMITS.example) err("example", `Example is longer than ${LIMITS.example} characters.`);
 
   if (w.hints.length !== 3) err("hints", "Exactly three hints are required.");
@@ -245,10 +254,12 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
   if (!cefr) errors.push("invalid cefr level");
   const category = str(r.category);
   if (!category) errors.push("missing category");
+  const imported = r.source === IMPORT_SOURCE;
   const meaning = str(r.meaning ?? r.definition);
-  if (!meaning) errors.push("missing definition");
+  if (!meaning && !imported) errors.push("missing definition");
   const example = str(r.example);
-  if (!example) errors.push("missing example");
+  if (!example && !imported) errors.push("missing example");
+  const sourceId = imported ? str(r.sourceId).slice(0, 80) : "";
 
   const hintsRaw = Array.isArray(r.hints) ? r.hints.map(str).filter(Boolean) : [];
   if (hintsRaw.length < 3) errors.push("needs three hints");
@@ -289,6 +300,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
       ...(studyJa.length ? { studyJa } : {}),
       ...(askKind ? { askKind } : {}),
       ...(illustration ? { illustration } : {}),
+      ...(imported ? { source: IMPORT_SOURCE, ...(sourceId ? { sourceId } : {}) } : {}),
     },
   };
 }

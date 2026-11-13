@@ -1,0 +1,229 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { clampPlayCount } from "@/lib/playCount";
+import { createClassLink } from "@/lib/class/createLink";
+import type { ImportReport } from "@/lib/studio/cqsImport";
+import { bankCategories, bankFromText, bankLevels, clearBank, convertBank, DEFAULT_GAME_WORDS, filterBank, loadBank, MAX_GAME_WORDS, pickForGame, type SavedBank } from "@/lib/studio/cqsBank";
+import { getBrowserStorage } from "@/lib/studio/storage";
+import { QrCode } from "../QrCode";
+import { TeacherPasscodeForm } from "../TeacherPasscodeForm";
+import { useTeacherAccess } from "../useTeacherAccess";
+
+/**
+ * The teacher's main page: choose the Classroom Quiz Show question bank (remembered in this browser) → level and category →
+ * number of questions → Start Pair Game → QR code. No activity, set, Writers' Room or approval is involved.
+ */
+export function BankHost() {
+  const access = useTeacherAccess();
+  const [bank, setBank] = useState<SavedBank | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [cefr, setCefr] = useState("all");
+  const [category, setCategory] = useState("all");
+  const [count, setCount] = useState(DEFAULT_GAME_WORDS);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [links, setLinks] = useState<{ primary: string; others: string[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setBank(loadBank(getBrowserStorage()));
+    setLoaded(true);
+  }, []);
+
+  const report: ImportReport | null = useMemo(() => (bank ? convertBank(bank) : null), [bank]);
+  const pool = useMemo(() => (report ? filterBank(report, { cefr, category }) : { ready: [], flagged: [] }), [report, cefr, category]);
+  const levels = useMemo(() => (report ? bankLevels(report) : []), [report]);
+  const categories = useMemo(() => (report ? bankCategories(report) : []), [report]);
+  const ticked = pool.flagged.filter((i) => chosen.has(i.sourceId)).length;
+  const available = pool.ready.length + ticked;
+  const playCount = clampPlayCount(count, Math.min(MAX_GAME_WORDS, Math.max(1, available)));
+  const reset = () => setLinks(null);
+
+  const load = async (file: File | undefined) => {
+    setError(null);
+    setNotice(null);
+    if (!file) return;
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      setError("The file could not be read. Your previous bank (if any) is unchanged.");
+      return;
+    }
+    const r = bankFromText(getBrowserStorage(), file.name, text);
+    if (!r.ok) {
+      setError(`${r.error} Your previous bank (if any) is unchanged.`);
+      return;
+    }
+    setBank(r.bank);
+    setCefr("all");
+    setCategory("all");
+    setChosen(new Set());
+    setLinks(null);
+    setNotice(r.remembered ? "Question bank loaded and remembered in this browser." : "Question bank loaded, but this browser would not remember it: choose the file again next time.");
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const forget = () => {
+    const s = getBrowserStorage();
+    if (s) clearBank(s);
+    setBank(null);
+    setChosen(new Set());
+    setLinks(null);
+    setNotice("The saved question bank was removed from this browser. Your original file is untouched.");
+  };
+
+  const start = async () => {
+    if (!report || available < 1) return;
+    setBusy(true);
+    setError(null);
+    const pick = pickForGame(pool, playCount, chosen);
+    const label = [cefr === "all" ? "All levels" : cefr, category === "all" ? "all categories" : category].join(" · ");
+    const r = await createClassLink(`Pair game — ${label}`.slice(0, 100), pick.words);
+    setBusy(false);
+    if (r.ok) setLinks(r.links);
+    else setError(r.message);
+  };
+
+  const copy = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(url);
+    } catch {
+      setCopied(null);
+    }
+  };
+
+  const fileInput = (label: string, primary: boolean) => (
+    <label className={primary ? "btn btn--hero bankhost__file" : "btn btn--small btn--ghost bankhost__file"}>
+      {label}
+      <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => void load(e.target.files?.[0])} />
+    </label>
+  );
+
+  if (!loaded) return <p className="note">Loading…</p>;
+
+  return (
+    <div className="bankhost">
+      <h3 className="bankhost__step">1. Question bank</h3>
+      {!bank || !report ? (
+        <>
+          <p className="note">Choose the Classroom Quiz Show question-bank file (<code>.json</code>). It is remembered in this browser, so you only need to do this once. It is read here and never uploaded or changed.</p>
+          {fileInput("Choose question-bank file", true)}
+        </>
+      ) : (
+        <>
+          <p className="bankhost__bank">
+            <b>{bank.fileName}</b> · {report.counts.total} questions
+            <span className="bankhost__counts" role="status">
+              <span className="c-good">{report.counts.ready} ready</span> · <span className="c-gold">{report.counts.flagged} flagged</span> · <span>{report.counts.skipped} skipped</span>
+            </span>
+          </p>
+          <div className="bankhost__actions">
+            {fileInput("Replace bank…", false)}
+            <button type="button" className="btn btn--small btn--ghost" onClick={forget}>Remove saved bank</button>
+          </div>
+          <details className="fold">
+            <summary>What do ready, flagged and skipped mean?</summary>
+            <p className="note"><b>Ready</b> questions are used automatically. <b>Flagged</b> ones are probably awkward to explain aloud (names, titles, picture clues…) and are only used if you tick them below. <b>Skipped</b> ones cannot be used (not approved, repeated, or fewer than three clean clues).</p>
+            {report.items.some((i) => i.status === "skipped") ? (
+              <ul className="cqs__skipped">
+                {report.items.filter((i) => i.status === "skipped").slice(0, 40).map((i) => <li key={`${i.sourceId}-${i.label}`}><b>{i.label}</b> <span className="note">{i.reasons.join(" ")}</span></li>)}
+              </ul>
+            ) : null}
+          </details>
+
+          <h3 className="bankhost__step">2. Level and category</h3>
+          <div className="cqs__filters">
+            <label className="field"><span className="field__label">Level</span>
+              <select className="setselect" value={cefr} onChange={(e) => { setCefr(e.target.value); reset(); }}>
+                <option value="all">All levels</option>
+                {levels.map((l) => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </label>
+            <label className="field"><span className="field__label">Category</span>
+              <select className="setselect" value={category} onChange={(e) => { setCategory(e.target.value); reset(); }}>
+                <option value="all">All categories</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </label>
+          </div>
+          <p className="note" role="status">
+            <b>{pool.ready.length}</b> ready question{pool.ready.length === 1 ? "" : "s"} match{pool.ready.length === 1 ? "es" : ""}
+            {pool.flagged.length ? <> · {pool.flagged.length} flagged (not used unless ticked){ticked ? `, ${ticked} ticked` : ""}</> : null}
+          </p>
+          {pool.flagged.length ? (
+            <details className="fold">
+              <summary>Flagged questions that match ({pool.flagged.length}): tick any you want to use</summary>
+              <ul className="cqs__list">
+                {pool.flagged.slice(0, 100).map((i) => (
+                  <li key={i.sourceId} className="cqs__row cqs__row--flagged">
+                    <label className="cqs__pick">
+                      <input type="checkbox" checked={chosen.has(i.sourceId)} onChange={() => { setChosen((p) => { const n = new Set(p); if (n.has(i.sourceId)) n.delete(i.sourceId); else n.add(i.sourceId); return n; }); reset(); }} aria-label={`Use ${i.label}`} />
+                      <span className="cqs__word">{i.word?.word}</span>
+                      <span className="note">{i.cefr} · {i.category}</span>
+                    </label>
+                    <p className="cqs__why">⚠ {i.reasons.join(" ")}</p>
+                  </li>
+                ))}
+              </ul>
+              {pool.flagged.length > 100 ? <p className="note">Showing the first 100 flagged questions. Narrow the level or category to see the rest.</p> : null}
+            </details>
+          ) : null}
+
+          <h3 className="bankhost__step">3. Number of questions</h3>
+          {available > 0 ? (
+            <label className="field playcount">
+              <span className="field__label">Number of questions</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={MAX_GAME_WORDS}
+                step={1}
+                value={count}
+                onChange={(e) => { const v = Math.floor(Number(e.target.value)); setCount(Number.isFinite(v) && v >= 1 ? Math.min(v, MAX_GAME_WORDS) : 1); reset(); }}
+              />
+              <span className="note">{available} usable · the game will have {playCount}</span>
+            </label>
+          ) : (
+            <p className="feedback feedback--wrong" role="alert">No usable questions match this level and category. Choose another, or tick flagged questions above.</p>
+          )}
+          {available > 0 && count > available ? (
+            <p className="note" role="status">You asked for {count}, but only {available} usable question{available === 1 ? "" : "s"} match, so the game will have {Math.min(available, MAX_GAME_WORDS)}. Choose “All levels” or “All categories” for more.</p>
+          ) : null}
+          {available > MAX_GAME_WORDS ? <p className="note">A game can have at most {MAX_GAME_WORDS} questions.</p> : null}
+
+          <h3 className="bankhost__step">4. Start</h3>
+          {access.status === "needs" ? (
+            <TeacherPasscodeForm error={access.error} busy={access.busy} onSubmit={access.submit} />
+          ) : access.status === "locked" ? (
+            <p className="note" role="alert">Hosting is locked: no teacher passcode is configured on this server.</p>
+          ) : (
+            <button type="button" className="btn btn--hero" onClick={start} disabled={busy || available < 1 || access.status === "loading"}>
+              {busy ? "Creating…" : "Start Pair Game"}
+            </button>
+          )}
+        </>
+      )}
+      {error ? <p className="feedback feedback--wrong" role="alert">{error}</p> : null}
+      {notice ? <p className="note" role="status">{notice}</p> : null}
+      {links ? (
+        <div className="hostclass__links" role="status">
+          <QrCode url={links.primary} />
+          <p className="note"><b>Students:</b> scan this code (or open the link) on your phone, enter a name and a group number. Two students with the same group number play together. Keep this page open while they play.</p>
+          {[links.primary, ...links.others].map((u) => (
+            <p key={u} className="hostclass__url">
+              <a href={u}>{u}</a>
+              <button type="button" className="btn btn--small btn--ghost" onClick={() => copy(u)}>{copied === u ? "Copied ✓" : "Copy"}</button>
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
