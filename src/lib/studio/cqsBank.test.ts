@@ -166,7 +166,7 @@ describe.runIf(existsSync(REAL))("the real export through the bank (read only)",
     const pool = filterBank(report, { cefr: "A1", category: "Food & Drink" });
     const pick = pickForGame(pool, 10, new Set());
     expect(pick.count).toBe(10);
-    expect(pick.words.every((w) => w.cefr === "A1" && w.category === "Food & Drink" && w.hints.length === 3)).toBe(true);
+    expect(pick.words.every((w) => w.cefr === "A1" && w.category === "Food & Drink" && w.hints.length === 4)).toBe(true); // ready questions keep all four clues
     expect(readFileSync(REAL, "utf8")).toBe(text);
   });
 });

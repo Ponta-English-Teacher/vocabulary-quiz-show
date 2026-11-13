@@ -33,13 +33,18 @@ describe("answer → target word", () => {
 });
 
 describe("one question", () => {
-  it("converts level, category, answer and clues (easiest clue first, the hardest one unused)", () => {
+  it("converts level, category, answer and ALL FOUR clues, in the source order (least to most helpful)", () => {
     const item = convertQuestion(q());
     expect(item.status).toBe("ready");
     const w = item.word!;
     expect(w).toMatchObject({ word: "cat", cefr: "A1", category: "Animals", partOfSpeech: "noun", source: "classroom-quiz-show", sourceId: "bank-a1-cat" });
-    expect(w.hints).toEqual(["It is a furry pet that says 'meow'.", "It is a popular pet with whiskers and soft fur.", "It likes to chase mice."]);
-    expect(item.notes.join(" ")).toMatch(/hardest clue/);
+    expect(w.hints).toEqual([
+      "It can turn its ears to hear sounds behind it, and it sleeps about 15 hours a day.",
+      "It likes to chase mice.",
+      "It is a popular pet with whiskers and soft fur.",
+      "It is a furry pet that says 'meow'.",
+    ]);
+    expect(item.notes).toEqual([]); // nothing was dropped
   });
   it("never invents a definition, example sentence, Japanese or Giver notes", () => {
     const w = convertQuestion(q()).word!;
@@ -49,12 +54,14 @@ describe("one question", () => {
     expect(w.studyJa).toBeUndefined();
     expect(w.giverInfo).toBeUndefined();
   });
-  it("leaves out a clue that contains the word and uses the others", () => {
+  it("leaves out a clue that contains the word, never replaces it, and FLAGS the question (three hints instead of four)", () => {
     const item = convertQuestion(q({ answer: "a strawberry", choices: ["a pear", "a plum", "a strawberry", "a fig"], chunks: ["Its seeds are on the outside.", "A strawberry is red.", "It is a small red fruit.", "You can eat it with cream."] }));
-    expect(item.status).toBe("ready");
+    expect(item.status).toBe("flagged");
+    expect(item.word!.hints).toEqual(["Its seeds are on the outside.", "It is a small red fruit.", "You can eat it with cream."]); // source order, nothing reordered or replaced
     expect(item.word!.hints.every((h) => !leaksTarget(item.word!, h))).toBe(true);
     expect(item.word!.hints).not.toContain("A strawberry is red.");
     expect(item.notes.join(" ")).toMatch(/Clue 2 was left out/);
+    expect(item.reasons.join(" ")).toMatch(/Only 3 of the 4 clues/);
   });
   it("skips a question with fewer than three clean clues", () => {
     const item = convertQuestion(q({ chunks: ["Cats sleep a lot.", "A cat likes mice.", "The cat says meow.", "It is a furry pet that says 'meow'."] }));
@@ -142,7 +149,11 @@ describe.runIf(existsSync(REAL))("the real 424-question export (read only)", () 
     for (const i of converted) {
       expect(leaksTarget(i.word!, i.word!.category)).toBe(false);
       for (const h of i.word!.hints) expect(leaksTarget(i.word!, h)).toBe(false);
-      expect(i.word!.hints).toHaveLength(3);
+      // Four hints when all four clues are clean; three (and flagged for review) when one had to be left out. Never fewer, never invented.
+      expect(i.word!.hints.length).toBeGreaterThanOrEqual(3);
+      expect(i.word!.hints.length).toBeLessThanOrEqual(4);
+      if (i.status === "ready") expect(i.word!.hints).toHaveLength(4);
+      if (i.word!.hints.length === 3) expect(i.status).toBe("flagged");
       expect(validateWord(i.word!).filter((x) => x.severity === "error")).toEqual([]);
     }
     expect(r.items.filter((i) => i.status === "skipped" && i.reasons[0]?.startsWith("Not imported")).length).toBe(6);

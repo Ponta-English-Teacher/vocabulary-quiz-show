@@ -38,6 +38,8 @@ export function coerceIllustration(raw: unknown, allowMarker = false): { src: st
 
 /** Words imported from the Classroom Quiz Show bank carry this marker; they may lack a definition and an example. */
 export const IMPORT_SOURCE = "classroom-quiz-show" as const;
+/** An imported word keeps up to this many hints (the opening hint plus three paid hints). */
+export const MAX_IMPORTED_HINTS = 4;
 
 export interface WordIssue {
   /** Machine-readable reason, where one matters (e.g. AI output with letter-only hints is rejected). */
@@ -156,7 +158,10 @@ export function validateWord(w: VocabWord, restrictions: readonly Restriction[] 
   }
   if (w.example.length > LIMITS.example) err("example", `Example is longer than ${LIMITS.example} characters.`);
 
-  if (w.hints.length !== 3) err("hints", "Exactly three hints are required.");
+  // Imported words keep every clean source clue, so they may have three or four hints; every other word has exactly three.
+  if (w.source === IMPORT_SOURCE ? w.hints.length < 3 || w.hints.length > MAX_IMPORTED_HINTS : w.hints.length !== 3) {
+    err("hints", w.source === IMPORT_SOURCE ? "Three or four hints are required." : "Exactly three hints are required.");
+  }
   w.hints.forEach((h, i) => {
     if (!h.trim()) err("hints", `Hint ${i + 1} is empty.`, i);
     else if (leaksTarget(w, h)) err("hints", `Hint ${i + 1} gives away the word.`, i);
@@ -294,7 +299,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
       cefr,
       meaning,
       example,
-      hints: hintsRaw.slice(0, 3),
+      hints: hintsRaw.slice(0, imported ? MAX_IMPORTED_HINTS : 3),
       ...(giverInfo ? { giverInfo } : {}),
       ...(ja.length ? { ja } : {}),
       ...(studyJa.length ? { studyJa } : {}),

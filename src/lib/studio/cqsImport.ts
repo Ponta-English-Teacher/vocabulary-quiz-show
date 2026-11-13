@@ -1,7 +1,7 @@
 import { CEFR_LEVELS, type CefrLevel, type VocabWord } from "@/data/vocab";
 import { normalize } from "@/lib/answer";
 import { newId } from "./ids";
-import { IMPORT_SOURCE, isVagueOpeningHint, isLetterOnlyHint, leaksTarget, normalizeCefr, validateWord, LIMITS } from "./validation";
+import { IMPORT_SOURCE, isVagueOpeningHint, isLetterOnlyHint, leaksTarget, MAX_IMPORTED_HINTS, normalizeCefr, validateWord, LIMITS } from "./validation";
 
 /**
  * One-way, offline conversion of a Classroom Quiz Show question-bank export into Vocabulary Quiz Show words.
@@ -11,8 +11,13 @@ import { IMPORT_SOURCE, isVagueOpeningHint, isLetterOnlyHint, leaksTarget, norma
  *
  *   answer      → target word (a leading "a / an / the" is dropped; the full answer stays accepted)
  *   cefrLevel   → cefr           categoryName → category
- *   chunks 1–4  → hints. Chunk 4 is the easiest and chunk 1 the hardest, so the clues are tried easiest first (4, 3, 2, 1). A clue that
- *                 contains the word is left out. The first three remaining clues become the three hints (hint 1 is the free opening hint).
+ *   chunks 1–4  → up to FOUR hints, IN THE SOURCE ORDER (1, 2, 3, 4). Classroom Quiz Show designs its clues so that chunk 1 is the
+ *                 hardest to guess (a distinctive fact) and chunk 4 the easiest and most decisive, so each clue is more helpful than the
+ *                 one before. That is the progression wanted here too: hint 1 is the free opening hint (a real, speakable fact that does
+ *                 not give the word away), and hints 2–4 are the three paid hints, each more helpful, so paying for one is worthwhile.
+ *                 Clues are never reordered or rewritten. A clue that contains the word (or is empty or too long) is left out and NEVER
+ *                 replaced by an invented one: a word with only three clean clues is flagged for review (playable with three hints),
+ *                 and a word with fewer than three is skipped.
  *
  * Every question ends up "ready" (looks fine), "flagged" (probably unsuitable for a spoken explain-and-guess game; the teacher decides)
  * or "skipped" (cannot be imported: not approved, malformed, duplicate, or fewer than three clean clues).
@@ -125,22 +130,23 @@ export function convertQuestion(raw: unknown, seen: Set<string> = new Set()): Im
   const dupe = forms.find((f) => seen.has(f));
   if (dupe) return skip(`Another question in this file already uses “${word}”.`);
 
-  // Clues, easiest first (chunk 4 → chunk 1). A clue that contains the word, or is blank or too long, is left out.
+  // Clues in the source order (chunk 1 → chunk 4: least to most helpful). A clue that contains the word, or is blank or too long, is left out.
   const target = { word, accept };
   const notes: string[] = [];
   const usable: string[] = [];
-  for (let i = 3; i >= 0; i--) {
+  for (let i = 0; i < 4; i++) {
     const clue = str(q.chunks[i]);
     if (!clue) notes.push(`Clue ${i + 1} is empty and was left out.`);
     else if (leaksTarget(target, clue)) notes.push(`Clue ${i + 1} was left out because it contains the word.`);
     else if (clue.length > LIMITS.hint) notes.push(`Clue ${i + 1} was left out because it is too long.`);
     else usable.push(clue);
   }
-  if (usable.length < 3) return { ...skip(`Only ${usable.length} usable clue${usable.length === 1 ? "" : "s"} (three are needed). ${notes.join(" ")}`.trim()), notes };
-  const hints = usable.slice(0, 3);
-  if (usable.length > 3) notes.push("The hardest clue was not used (a word has three hints).");
+  if (usable.length < 3) return { ...skip(`Only ${usable.length} usable clue${usable.length === 1 ? "" : "s"} (at least three are needed). ${notes.join(" ")}`.trim()), notes };
+  const hints = usable.slice(0, MAX_IMPORTED_HINTS);
 
   const flags = suitabilityFlags({ word, accept, prompt, hints });
+  // Four hints is the design. Three means a source clue was unusable: say which, and let the teacher decide (nothing is made up).
+  if (hints.length < MAX_IMPORTED_HINTS) flags.push(`Only ${hints.length} of the 4 clues could be used, so this word has ${hints.length} hints and the Giver gets fewer paid hints. ${notes.join(" ")}`.trim());
   const pos = /\s/.test(word) ? "phrase" : "noun";
   const vocab: VocabWord = {
     id: newId("w"),

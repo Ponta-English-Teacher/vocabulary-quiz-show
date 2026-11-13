@@ -148,7 +148,8 @@ export function applyAiHints(a: Activity, setId: string, wordId: string, fresh: 
   const kept = [0, 1, 2].filter((i) => mine.includes(i) && (!only || only.includes(i)));
   const changed = [0, 1, 2].filter((i) => !mine.includes(i) && (!only || only.includes(i)) && (fresh[i] ?? "") !== (word.hints[i] ?? ""));
   if (!changed.length) return { activity: a, kept, changed };
-  const hints = [0, 1, 2].map((i) => (changed.includes(i) ? fresh[i] : word.hints[i] ?? ""));
+  // Hints beyond the third (imported words may have four) are never touched by an AI rewrite.
+  const hints = Array.from({ length: Math.max(3, word.hints.length) }, (_, i) => (changed.includes(i) ? fresh[i] : word.hints[i] ?? ""));
   return {
     activity: mapSet(a, setId, (s) => edited(s, s.words.map((w) => (w.id === wordId ? { ...w, hints } : w)))),
     kept,
