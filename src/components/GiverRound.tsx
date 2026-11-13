@@ -59,7 +59,7 @@ export function GiverRound({
       {opening ? (
         <section className="clues" aria-label="Opening hint">
           <p className="clue clue--opening">
-            <span className="clue__tag">Opening hint · free · only you can see it</span>
+            <span className="clue__tag">Opening hint · free · say it aloud</span>
             <span className="clue__text">{opening}</span>
           </p>
         </section>
@@ -101,6 +101,7 @@ export function GiverRound({
           </ol>
         ) : null}
         {hasLaterHints && nextHint >= word.hints.length ? <p className="note">All prepared hints are used.</p> : null}
+        {hasLaterHints ? <p className="note">Say each hint aloud first. {taker}&apos;s screen shows a hint only after you reveal the next one.</p> : null}
 
         <div className="owncount">
           <button

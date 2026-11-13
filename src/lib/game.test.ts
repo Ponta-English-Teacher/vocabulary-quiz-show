@@ -320,13 +320,14 @@ describe("one answer scores once", () => {
 });
 
 describe("what the Taker's view contains", () => {
-  it("hides the opening hint (Giver only), shows only EXTRA hints the Giver reveals, and exposes no Japanese text", () => {
+  it("one-hint delay: the newest revealed hint is withheld from the Taker; earlier ones (the opening hint included) are shown; no Japanese text", () => {
     let s = pick("umbrella");
     let view = redactForTaker(s);
     const w = view.words.find((x) => x.id === id("umbrella"))!;
     expect(w.hints).toEqual(["", "", ""]);
     s = run([{ type: "REVEAL_HINT" }], s);
-    expect(redactForTaker(s).words.find((x) => x.id === id("umbrella"))!.hints).toEqual(["", DEFAULT_SET.words[0].hints[1], ""]);
+    // first paid hint revealed: the Taker may now see the opening hint, but NOT the hint just revealed
+    expect(redactForTaker(s).words.find((x) => x.id === id("umbrella"))!.hints).toEqual([DEFAULT_SET.words[0].hints[0], "", ""]);
     view = redactForTaker(s);
     const json = JSON.stringify(view);
     expect(json).not.toContain("傘");

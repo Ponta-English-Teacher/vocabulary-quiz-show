@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { currentWord, type Feedback, type GameAction, type GameState } from "@/lib/game";
-import { FREE_HINTS, takerPointsFor } from "@/lib/scoring";
+import { takerPointsFor } from "@/lib/scoring";
 import { PointsMeter } from "./PointsMeter";
 import { SkipButton } from "./SkipButton";
 
@@ -47,8 +47,8 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
 
   if (!word) return null;
   const taker = state.players[state.giver === 0 ? 1 : 0].name;
-  // Only the EXTRA hints the Giver chose to reveal. The opening hint is the Giver's alone (the server never sends it here).
-  const shownHints = word.hints.map((h, n) => ({ h, n })).filter((x) => x.n >= FREE_HINTS && x.n < state.revealedHints && x.h);
+  // Hints the server chose to send: one behind the Giver (the newest one is said aloud first). Blank text = not for the Taker.
+  const shownHints = word.hints.map((h, n) => ({ h, n })).filter((x) => x.h);
   const hasJapanese = (word.ja ?? []).length > 0; // the Taker only learns THAT a Japanese answer exists, never what it is
   const jaPoints = takerPointsFor(state.hintsUsed, "ja", state.illustrationUsed);
 
@@ -79,7 +79,7 @@ export function TakerRound({ state, dispatch }: { state: GameState; dispatch: (a
         <section className="clues" aria-label="Hints" aria-live="polite">
           {shownHints.map(({ h, n }) => (
             <p key={n} className="clue">
-              <span className="clue__tag">{`Extra hint ${n}`}</span>
+              <span className="clue__tag">{`Hint ${n + 1}`}</span>
               <span className="clue__text">{h}</span>
             </p>
           ))}

@@ -318,6 +318,9 @@ export function getFinalResult(players: [Player, Player]): FinalResult {
   return { kind: "winner", winner: players[0].score > players[1].score ? 0 : 1 };
 }
 
+/** How many of the revealed hints (counted from the opening hint) the Taker's screen may show: all but the newest one. */
+export const takerVisibleHints = (state: Pick<GameState, "revealedHints">): number => Math.max(0, state.revealedHints - 1);
+
 /**
  * What the Taker's device is allowed to know. Hides the text of every word that
  * is still unsolved (and the current word until the round is over).
@@ -335,9 +338,11 @@ export function redactForTaker(state: GameState): GameState {
       accept: [],
       meaning: "",
       example: "",
-      // The OPENING hint (index < FREE_HINTS) is the Giver's alone: the Taker must find the word by asking questions.
-      // Only the extra hints the Giver has chosen to reveal reach the Taker; everything else stays blank.
-      hints: w.hints.map((h, i) => (inPlay && i >= FREE_HINTS && i < state.revealedHints ? h : "")),
+      // ONE-HINT DELAY: the Giver says each new hint aloud first. The newest revealed hint is withheld from the Taker's screen
+      // (its text is not even in the response); every hint revealed BEFORE it, the opening hint included, is shown.
+      //   nothing revealed yet (opening hint only) -> none      first paid hint revealed -> the opening hint
+      //   second paid hint revealed -> opening + first paid     ...and so on. Unrevealed hints are always blank.
+      hints: w.hints.map((h, i) => (inPlay && i < takerVisibleHints(state) ? h : "")),
       // Same length, empty text: the Taker's phone can tell whether Japanese credit exists, never what the answers are.
       ja: (w.ja ?? []).map(() => ""),
       giverInfo: undefined,

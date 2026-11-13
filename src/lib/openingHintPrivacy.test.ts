@@ -76,8 +76,8 @@ describe.each([
     await hint.act(hint.A.token, { type: "PICK", wordId: hint.words[0].id });
     await hint.act(hint.A.token, { type: "REVEAL_HINT" }); // extra hint: costs 15
     const t = await hint.view(hint.B.token);
-    expect(t.game!.words[0].hints).toEqual(["", hint.words[0].hints[1], ""]); // extra hint visible to the Taker, opening one still not
-    expect(JSON.stringify(t)).not.toContain(opening(hint.words[0]));
+    expect(t.game!.words[0].hints).toEqual([hint.words[0].hints[0], "", ""]); // one-hint delay: the opening hint is now visible, the new hint is not
+    expect(JSON.stringify(t)).not.toContain(hint.words[0].hints[1]);
     expect(t.game).toMatchObject({ hintsUsed: 1, revealedHints: 2 });
     await hint.act(hint.B.token, { type: "GUESS", text: hint.words[0].word });
     expect(await hint.scores()).toEqual([43, 85]);
@@ -146,20 +146,26 @@ describe("demo mode follows the same Giver/Taker distinction", () => {
     const word = currentWord(s)!;
     const giver = renderToStaticMarkup(h(GiverRound, { state: s, dispatch: () => undefined }));
     expect(giver).toContain(word.hints[0]);
-    expect(giver).toContain("only you can see it");
+    expect(giver).toContain("Opening hint");
+    expect(giver).toContain("Say each hint aloud first");
     const taker = renderToStaticMarkup(h(TakerRound, { state: redactForTaker(s), dispatch: () => undefined }));
     expect(taker).not.toContain(word.hints[0]);
     expect(taker).not.toContain("Opening hint");
     expect(taker).toContain("Listen to your partner and guess the word.");
   });
-  it("extra hints still reach the Taker once the Giver reveals them, labelled as extra hints", () => {
+  it("one-hint delay on the Taker's screen: each hint appears when the NEXT one is revealed", () => {
     let s = start();
     const word = currentWord(s)!;
     s = gameReducer(s, { type: "REVEAL_HINT" });
-    const taker = renderToStaticMarkup(h(TakerRound, { state: redactForTaker(s), dispatch: () => undefined }));
-    expect(taker).toContain(word.hints[1]);
-    expect(taker).toContain("Extra hint 1");
-    expect(taker).not.toContain(word.hints[0]);
+    let taker = renderToStaticMarkup(h(TakerRound, { state: redactForTaker(s), dispatch: () => undefined }));
+    expect(taker).toContain(word.hints[0]); // the opening hint is now shown...
+    expect(taker).toContain("Hint 1");
+    expect(taker).not.toContain(word.hints[1]); // ...but not the hint the Giver has only just revealed
     expect(s.hintsUsed).toBe(1); // the opening hint itself stays free
+    s = gameReducer(s, { type: "REVEAL_HINT" });
+    taker = renderToStaticMarkup(h(TakerRound, { state: redactForTaker(s), dispatch: () => undefined }));
+    expect(taker).toContain(word.hints[0]);
+    expect(taker).toContain(word.hints[1]);
+    expect(taker).not.toContain(word.hints[2]);
   });
 });

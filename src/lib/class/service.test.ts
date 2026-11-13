@@ -635,7 +635,9 @@ describe("opening hint (classroom)", () => {
     await paid.giverPhone.act({ type: "PICK", wordId: paid.activity.words[0].id });
     await paid.giverPhone.act({ type: "REVEAL_HINT" });
     await paid.takerPhone.poll();
-    expect(paid.takerPhone.view!.game!.words[0].hints[1]).toBe(paid.activity.words[0].hints[1]); // shown on both phones once revealed
+    // one-hint delay: the Taker now sees the opening hint, not the hint the Giver has just revealed
+    expect(paid.takerPhone.view!.game!.words[0].hints).toEqual([paid.activity.words[0].hints[0], "", ""]);
+    expect(paid.giverPhone.view!.game!.words[0].hints.slice(0, 2)).toEqual(paid.activity.words[0].hints.slice(0, 2)); // the Giver sees everything revealed
     await paid.takerPhone.act({ type: "GUESS", text: "umbrella" });
     expect(paid.takerPhone.view!.game!.lastResult).toMatchObject({ takerPoints: 85, giverPoints: 43, hintsUsed: 1 });
   });
