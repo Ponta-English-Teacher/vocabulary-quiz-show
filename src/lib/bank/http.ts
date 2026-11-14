@@ -9,6 +9,7 @@ import { BANK_STATUSES, type BankStatus } from "./types";
  * Authentication is checked FIRST, before the bank storage is even opened. Responses never contain the passcode or storage credentials.
  *
  *   GET    /api/wordbank?status=&cefr=&category=&q=   list words
+ *   POST   /api/wordbank           {word}              create one word by hand (draft)
  *   GET    /api/wordbank/export                       the complete bank as a JSON file
  *   POST   /api/wordbank/import   {text, filename?, dryRun?, keep?}   preview (dryRun) or import as drafts
  *   PATCH  /api/wordbank/<id>     {patch}             edit (returns the word to draft)
@@ -74,6 +75,12 @@ async function route(request: Request, path: string[], service: BankService): Pr
     if (status && !(BANK_STATUSES as readonly string[]).includes(status)) return err(400, "bad_request", "Unknown status.");
     const r = await service.list({ status: (status as BankStatus) || undefined, cefr: q.get("cefr") || undefined, category: q.get("category") || undefined, q: q.get("q") || undefined });
     return json({ ok: true, ...r });
+  }
+  if (path.length === 0 && method === "POST") {
+    const b = await body(request);
+    if (!b) return err(400, "bad_request", "Invalid request.");
+    const r = await service.create(b.word);
+    return r.ok ? json(r, 201) : fromService(r);
   }
   if (a === "export" && path.length === 1 && method === "GET") {
     const file = await service.exportAll();

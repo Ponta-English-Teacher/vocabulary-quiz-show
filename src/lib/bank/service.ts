@@ -45,6 +45,39 @@ export interface BankExportFile {
 
 const textOrUndef = (v: unknown): string | undefined | "bad" => (v === undefined ? undefined : typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "bad");
 
+/** Read the editable fields of a request. Unknown fields (id, status, source…) are ignored: they can never be set through the API. */
+function coerce(patch: unknown): { out: Parameters<typeof editWord>[1] } | ServiceError {
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) return fail("bad_request", "Nothing to change.");
+  const p = patch as Record<string, unknown>;
+  const out: Parameters<typeof editWord>[1] = {};
+  for (const k of ["word", "category", "topic", "giverJa", "meaning", "example"] as const) {
+    if (!(k in p)) continue;
+    const v = textOrUndef(p[k]);
+    if (v === "bad") return fail("bad_request", `${k} must be text.`);
+    if ((k === "word" || k === "category") && !v) return fail("bad_request", `${k} cannot be empty.`);
+    (out as Record<string, unknown>)[k] = v || undefined;
+  }
+  if ("accept" in p) {
+    if (!Array.isArray(p.accept) || p.accept.some((a) => typeof a !== "string")) return fail("bad_request", "accept must be a list of text.");
+    out.accept = (p.accept as string[]).map((a) => a.replace(/\s+/g, " ").trim()).filter(Boolean);
+  }
+  if ("hints" in p) {
+    if (!Array.isArray(p.hints) || p.hints.some((h) => typeof h !== "string")) return fail("bad_request", "hints must be a list of text.");
+    out.hints = (p.hints as string[]).map((h) => h.replace(/\s+/g, " ").trim()) as unknown as BankWord["hints"];
+  }
+  if ("partOfSpeech" in p) {
+    const pos = normalizePartOfSpeech(p.partOfSpeech);
+    if (!pos) return fail("bad_request", "Part of speech must be noun, verb, adjective, adverb or phrase.");
+    out.partOfSpeech = pos;
+  }
+  if ("cefr" in p) {
+    const c = normalizeCefr(p.cefr);
+    if (!c) return fail("bad_request", "CEFR level must be A1, A2, B1, B2, C1 or C2.");
+    out.cefr = c;
+  }
+  return { out };
+}
+
 export class BankService {
   constructor(private store: BankStore, private now: () => string = () => new Date().toISOString(), private makeId: () => string = () => newId("b")) {}
 
@@ -170,6 +203,28 @@ export class BankService {
     return outcome;
   }
 
+  // ---------------------------------------------------------------- create
+
+  /** Write a new word by hand (no AI). It always starts as a DRAFT with source "manual". Hints may be unfinished; approval checks them. */
+  async create(input: unknown): Promise<{ ok: true; word: BankWord; issues: BankIssue[] } | ServiceError> {
+    const c = coerce(input);
+    if (!("out" in c)) return c;
+    const o = c.out;
+    if (!o.word || !o.category || !o.partOfSpeech || !o.cefr) return fail("bad_request", "A new word needs the word, part of speech, category and CEFR level.");
+    const hints = [...(o.hints ?? [])];
+    if (hints.length > HINT_COUNT) return fail("bad_request", `A word has exactly ${HINT_COUNT} hints.`);
+    while (hints.length < HINT_COUNT) hints.push("");
+    const now = this.now();
+    const w: BankWord = {
+      id: this.makeId(), word: o.word, accept: o.accept ?? [], partOfSpeech: o.partOfSpeech, category: o.category, cefr: o.cefr,
+      ...(o.topic ? { topic: o.topic } : {}), ...(o.giverJa ? { giverJa: o.giverJa } : {}), ...(o.meaning ? { meaning: o.meaning } : {}), ...(o.example ? { example: o.example } : {}),
+      hints: hints as unknown as BankWord["hints"], status: "draft", source: "manual", createdAt: now, updatedAt: now,
+    };
+    if (complete(w) && !(await this.claim(w))) return fail("conflict", "An identical word (same word, level and hints) is already in the bank.");
+    await this.save(w);
+    return { ok: true, word: w, issues: validateBankWord(w) };
+  }
+
   // ------------------------------------------------------------------ edit
 
   /** Edit content. The word returns to draft and must be approved again. Saved even if it still has problems (they are returned). */
@@ -177,35 +232,9 @@ export class BankService {
     const w = await this.load(id);
     if (!w) return fail("not_found", "That word does not exist.");
     if (w.status === "archived") return fail("conflict", "Restore an archived word before editing it.");
-    if (!patch || typeof patch !== "object" || Array.isArray(patch)) return fail("bad_request", "Nothing to change.");
-    const p = patch as Record<string, unknown>;
-    const out: Parameters<typeof editWord>[1] = {};
-
-    for (const k of ["word", "category", "topic", "giverJa", "meaning", "example"] as const) {
-      if (!(k in p)) continue;
-      const v = textOrUndef(p[k]);
-      if (v === "bad") return fail("bad_request", `${k} must be text.`);
-      if ((k === "word" || k === "category") && !v) return fail("bad_request", `${k} cannot be empty.`);
-      (out as Record<string, unknown>)[k] = v || undefined;
-    }
-    if ("accept" in p) {
-      if (!Array.isArray(p.accept) || p.accept.some((a) => typeof a !== "string")) return fail("bad_request", "accept must be a list of text.");
-      out.accept = (p.accept as string[]).map((a) => a.replace(/\s+/g, " ").trim()).filter(Boolean);
-    }
-    if ("hints" in p) {
-      if (!Array.isArray(p.hints) || p.hints.some((h) => typeof h !== "string")) return fail("bad_request", "hints must be a list of text.");
-      out.hints = (p.hints as string[]).map((h) => h.replace(/\s+/g, " ").trim()) as unknown as BankWord["hints"];
-    }
-    if ("partOfSpeech" in p) {
-      const pos = normalizePartOfSpeech(p.partOfSpeech);
-      if (!pos) return fail("bad_request", "Part of speech must be noun, verb, adjective, adverb or phrase.");
-      out.partOfSpeech = pos;
-    }
-    if ("cefr" in p) {
-      const c = normalizeCefr(p.cefr);
-      if (!c) return fail("bad_request", "CEFR level must be A1, A2, B1, B2, C1 or C2.");
-      out.cefr = c;
-    }
+    const c = coerce(patch);
+    if (!("out" in c)) return c;
+    const out = c.out;
     // Provenance, status and ids can never be changed through an edit.
     const next = editWord(w, out, this.now());
     if (complete(next) && !(await this.claim(next))) return fail("conflict", "An identical word (same word, level and hints) is already in the bank.");

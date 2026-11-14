@@ -50,6 +50,7 @@ export function Welcome({
           <h2 id="mode-class" className="mode__title">Start a Pair Game</h2>
           <p className="note">Choose your question bank, pick a level and category, and start. Students scan the QR code on their own phones and play in pairs: one Giver, one Taker.</p>
           <BankHost />
+          <p className="note"><a href="/wordbank">Word Bank (teacher)</a> — build and approve our own questions. Games do not use it yet.</p>
         </section>
 
         <details className="more">

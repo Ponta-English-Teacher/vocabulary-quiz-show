@@ -428,3 +428,44 @@ describe("data isolation", () => {
 });
 
 export type { BankWord };
+
+describe("create by hand", () => {
+  const input = (over: Record<string, unknown> = {}) => ({ word: "alphaz", partOfSpeech: "noun", category: "Home", cefr: "A2", hints: hintsFor(3), giverJa: "ゼット", ...over });
+  it("creates a manual draft and never approves it", async () => {
+    const s = svc();
+    const r = await s.create(input());
+    expect(r).toMatchObject({ ok: true, word: { status: "draft", source: "manual", giverJa: "ゼット" } });
+    expect((await s.list()).counts).toMatchObject({ draft: 1, approved: 0 });
+    if (r.ok) expect(r.issues.filter((i) => i.severity === "error")).toEqual([]);
+  });
+  it("accepts unfinished hints as a draft (reporting the problem) and ignores id/status/source", async () => {
+    const s = svc();
+    const r = await s.create(input({ hints: ["Only the first hint is written so far."], id: "evil", status: "approved", source: "file" }));
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.word).toMatchObject({ status: "draft", source: "manual", hints: ["Only the first hint is written so far.", "", "", ""] });
+    expect(r.word.id).not.toBe("evil");
+    expect(r.issues.map((i) => i.code)).toContain("empty");
+    expect(await s.approve(r.word.id)).toMatchObject({ ok: false, code: "invalid" });
+  });
+  it("requires the essentials and rejects too many hints", async () => {
+    const s = svc();
+    expect(await s.create({ word: "x" })).toMatchObject({ ok: false, code: "bad_request" });
+    expect(await s.create(input({ hints: ["a", "b", "c", "d", "e"] }))).toMatchObject({ ok: false, code: "bad_request" });
+    expect(await s.create(null)).toMatchObject({ ok: false, code: "bad_request" });
+  });
+  it("refuses an identical twin but allows the same word at another level", async () => {
+    const s = svc();
+    expect((await s.create(input())).ok).toBe(true);
+    expect(await s.create(input())).toMatchObject({ ok: false, code: "conflict" });
+    expect((await s.create(input({ cefr: "B2" }))).ok).toBe(true);
+  });
+  it("works through the authenticated HTTP route", async () => {
+    const { deps } = mkDeps();
+    expect((await call(deps, "POST", [], { body: { word: input() }, pass: null })).status).toBe(401);
+    const ok = await call(deps, "POST", [], { body: { word: input() } });
+    expect(ok.status).toBe(201);
+    expect((await ok.json()).word).toMatchObject({ source: "manual", status: "draft" });
+    expect((await call(deps, "POST", [], { body: { word: input() } })).status).toBe(409);
+    expect((await call(deps, "POST", [], { body: { word: {} } })).status).toBe(400);
+  });
+});
