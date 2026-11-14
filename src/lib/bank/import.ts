@@ -26,6 +26,8 @@ export interface ImportCandidate {
   meaning?: string;
   example?: string;
   hints: string[];
+  /** Where the word came from. Only "classroom-quiz-show" is kept from a file; anything else is "file". */
+  source: BankWord["source"];
   sourceId?: string;
 }
 
@@ -169,6 +171,9 @@ export function toCandidate(raw: Raw): { candidate: ImportCandidate | null; erro
   while (hintsRaw.length > HINT_COUNT && !hintsRaw[hintsRaw.length - 1]) hintsRaw.pop();
   const ja = first(raw, "giverja", "japanese", "ja", "japanesemeaning");
   const giverJa = Array.isArray(ja) ? ja.map(clean).filter(Boolean).join("、") : clean(ja);
+  // Provenance is preserved when the file says so. A bare `id` only counts as a source id for words that came from Classroom Quiz Show.
+  const source: BankWord["source"] = clean(raw.source) === "classroom-quiz-show" ? "classroom-quiz-show" : "file";
+  const sourceId = clean(raw.sourceid || (source === "classroom-quiz-show" ? raw.id : "")).slice(0, 80);
   const status = clean(raw.status).toLowerCase();
   if (status && status !== "draft") warnings.push({ severity: "warning", code: "status_ignored", field: "status", message: `The file says "${status}", but every imported word starts as a draft and must be approved by a teacher.` });
 
@@ -183,7 +188,8 @@ export function toCandidate(raw: Raw): { candidate: ImportCandidate | null; erro
     ...(clean(raw.meaning) ? { meaning: clean(raw.meaning) } : {}),
     ...(clean(raw.example) ? { example: clean(raw.example) } : {}),
     hints: hintsRaw,
-    ...(clean(first(raw, "sourceid", "id")) ? { sourceId: clean(first(raw, "sourceid", "id")).slice(0, 80) } : {}),
+    source,
+    ...(sourceId ? { sourceId } : {}),
   };
   if (!pos) errors.push({ severity: "error", code: "bad_pos", field: "partOfSpeech", message: "Part of speech must be noun, verb, adjective, adverb or phrase." });
   if (!cefr) errors.push({ severity: "error", code: "bad_cefr", field: "cefr", message: `CEFR level must be one of ${CEFR_LEVELS.join(", ")}.` });
@@ -264,7 +270,7 @@ export function draftsFromAnalysis(analysis: ImportAnalysis, now: string, makeId
       ...(c.example ? { example: c.example } : {}),
       hints: [c.hints[0], c.hints[1], c.hints[2], c.hints[3]] as BankWord["hints"],
       status: "draft" as const,
-      source: "file" as const,
+      source: c.source,
       ...(c.sourceId ? { sourceId: c.sourceId } : {}),
       createdAt: now,
       updatedAt: now,
