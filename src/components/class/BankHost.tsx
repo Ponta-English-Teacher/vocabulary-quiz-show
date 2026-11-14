@@ -8,6 +8,8 @@ import { bankCategories, bankFromText, bankLevels, clearBank, convertBank, DEFAU
 import { downloadBackup } from "@/lib/studio/backup";
 import { requestLatestBank } from "@/lib/studio/cqsSync";
 import { getBrowserStorage } from "@/lib/studio/storage";
+import { BankSourceSelect, DEFAULT_BANK_SOURCE, type BankSource } from "./BankSourceSelect";
+import { IndependentBankPicker } from "./IndependentBankPicker";
 import { QrCode } from "../QrCode";
 import { TeacherPasscodeForm } from "../TeacherPasscodeForm";
 import { useTeacherAccess } from "../useTeacherAccess";
@@ -32,6 +34,9 @@ export function BankHost() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [syncing, setSyncing] = useState(false);
   const [pending, setPending] = useState<Extract<SyncEvaluation, { ok: true }> | null>(null);
+  /** Which bank the next game uses. Always starts as the Current Bank; it is never remembered or switched automatically. */
+  const [source, setSource] = useState<BankSource>(DEFAULT_BANK_SOURCE);
+  const [indepCount, setIndepCount] = useState<number | null>(null);
 
   useEffect(() => {
     setBank(loadBank(getBrowserStorage()));
@@ -181,6 +186,16 @@ export function BankHost() {
       ) : access.status === "locked" ? (
         <p className="note" role="alert">Teacher tools are locked: no teacher passcode is configured on this server.</p>
       ) : null}
+      <BankSourceSelect
+        source={source}
+        currentCount={report ? report.counts.total : null}
+        independentCount={indepCount}
+        onChange={(next) => { setSource(next); setLinks(null); if (next === "independent") { setError(null); setNotice(null); } }}
+      />
+      {source === "independent" ? (
+        <IndependentBankPicker allowed={access.allowed} onLinks={setLinks} onCount={setIndepCount} />
+      ) : (
+      <>
       <h3 className="bankhost__step">1. Question bank</h3>
       <button type="button" className="btn btn--hero" onClick={sync} disabled={syncing || !access.allowed}>
         {syncing ? "Syncing…" : "Sync Latest Bank"}
@@ -298,6 +313,8 @@ export function BankHost() {
         <p className="note">Downloads everything saved in this browser (the question bank with its ready/flagged/skipped report, and any saved Studio activities) as one JSON file. It only reads: nothing is changed or removed, and the teacher passcode is not included. Keep the file somewhere safe.</p>
         <button type="button" className="btn btn--small btn--ghost" onClick={backup}>Export Backup</button>
       </details>
+      </>
+      )}
       {error ? <p className="feedback feedback--wrong" role="alert">{error}</p> : null}
       {notice ? <p className="note" role="status">{notice}</p> : null}
       {links ? (

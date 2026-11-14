@@ -353,5 +353,6 @@ export function redactForTaker(state: GameState): GameState {
       illustration: undefined,
     };
   });
-  return { ...state, words };
+  // The Giver's Japanese meaning never reaches the Taker: not in play, not at the reveal, not for any word.
+  return { ...state, words: words.map((w) => (w.giverJa === undefined ? w : { ...w, giverJa: undefined })) };
 }

@@ -38,6 +38,9 @@ export function coerceIllustration(raw: unknown, allowMarker = false): { src: st
 
 /** Words imported from the Classroom Quiz Show bank carry this marker; they may lack a definition and an example. */
 export const IMPORT_SOURCE = "classroom-quiz-show" as const;
+/** Words that come from the independent Word Bank carry this marker. Like imported words they may lack a definition and example, and have four hints. */
+export const BANK_SOURCE = "vqs-bank" as const;
+export const isImportedSource = (s: unknown): s is typeof IMPORT_SOURCE | typeof BANK_SOURCE => s === IMPORT_SOURCE || s === BANK_SOURCE;
 /** An imported word keeps up to this many hints (the opening hint plus three paid hints). */
 export const MAX_IMPORTED_HINTS = 4;
 
@@ -146,21 +149,21 @@ export function validateWord(w: VocabWord, restrictions: readonly Restriction[] 
   else if (leaksTarget(w, w.category)) err("category", "The category gives away the word (the Taker can see it).");
 
   if (!w.meaning.trim()) {
-    if (w.source === IMPORT_SOURCE) warn("meaning", "No definition (imported words have none; nothing was invented).");
+    if (isImportedSource(w.source)) warn("meaning", "No definition (imported words have none; nothing was invented).");
     else err("meaning", "Definition is empty.");
   }
   else if (leaksTarget(w, w.meaning)) warn("meaning", "The definition contains the target word — the Giver would have to avoid reading it.");
   if (w.meaning.length > LIMITS.meaning) err("meaning", `Definition is longer than ${LIMITS.meaning} characters.`);
 
   if (!w.example.trim()) {
-    if (w.source === IMPORT_SOURCE) warn("example", "No example sentence (imported words have none; nothing was invented).");
+    if (isImportedSource(w.source)) warn("example", "No example sentence (imported words have none; nothing was invented).");
     else err("example", "Example sentence is empty.");
   }
   if (w.example.length > LIMITS.example) err("example", `Example is longer than ${LIMITS.example} characters.`);
 
   // Imported words keep every clean source clue, so they may have three or four hints; every other word has exactly three.
-  if (w.source === IMPORT_SOURCE ? w.hints.length < 3 || w.hints.length > MAX_IMPORTED_HINTS : w.hints.length !== 3) {
-    err("hints", w.source === IMPORT_SOURCE ? "Three or four hints are required." : "Exactly three hints are required.");
+  if (isImportedSource(w.source) ? w.hints.length < 3 || w.hints.length > MAX_IMPORTED_HINTS : w.hints.length !== 3) {
+    err("hints", isImportedSource(w.source) ? "Three or four hints are required." : "Exactly three hints are required.");
   }
   w.hints.forEach((h, i) => {
     if (!h.trim()) err("hints", `Hint ${i + 1} is empty.`, i);
@@ -259,7 +262,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
   if (!cefr) errors.push("invalid cefr level");
   const category = str(r.category);
   if (!category) errors.push("missing category");
-  const imported = r.source === IMPORT_SOURCE;
+  const imported = isImportedSource(r.source);
   const meaning = str(r.meaning ?? r.definition);
   if (!meaning && !imported) errors.push("missing definition");
   const example = str(r.example);
@@ -287,6 +290,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
   const studyJa = coerceJa(r.studyJa);
   const illustration = coerceIllustration(r.illustration);
   const askKind = coerceAskKind(r.askKind);
+  const giverJa = str(r.giverJa).slice(0, 60);
 
   if (errors.length || !pos || !cefr) return { errors };
   return {
@@ -305,7 +309,8 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
       ...(studyJa.length ? { studyJa } : {}),
       ...(askKind ? { askKind } : {}),
       ...(illustration ? { illustration } : {}),
-      ...(imported ? { source: IMPORT_SOURCE, ...(sourceId ? { sourceId } : {}) } : {}),
+      ...(imported ? { source: r.source as typeof IMPORT_SOURCE | typeof BANK_SOURCE, ...(sourceId ? { sourceId } : {}) } : {}),
+      ...(giverJa ? { giverJa } : {}),
     },
   };
 }

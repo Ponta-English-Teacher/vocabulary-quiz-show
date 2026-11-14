@@ -135,9 +135,10 @@ export function GiverRound({
 
       {!state.illustrationUsed && onRequestIllustration ? <IllustrationRequest onRequest={onRequestIllustration} /> : null}
 
-      {word.meaning || word.example ? (
+      {word.meaning || word.example || word.giverJa ? (
         <details className="fold">
-          <summary>Meaning and example</summary>
+          <summary>{word.giverJa ? "Meaning and Japanese" : "Meaning and example"}</summary>
+          {word.giverJa ? <p className="meaning__ja" lang="ja">日本語: {word.giverJa} <span className="note">(only you can see this)</span></p> : null}
           {word.meaning ? <p className="meaning__text">{word.meaning}</p> : null}
           {word.example ? <p className="meaning__eg">“{word.example}”</p> : null}
         </details>

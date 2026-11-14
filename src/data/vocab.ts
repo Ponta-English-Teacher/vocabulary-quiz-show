@@ -70,7 +70,12 @@ export interface VocabWord {
    * Where the word came from, when it was imported from another app's export. Imported words may have an EMPTY `meaning` and `example`
    * (nothing is invented for them) and are never sent to AI for automatic translation.
    */
-  source?: "classroom-quiz-show";
+  source?: "classroom-quiz-show" | "vqs-bank";
+  /**
+   * Optional Japanese meaning for the GIVER only (from the independent Word Bank). Shown on the Giver's screen while the word is in play;
+   * never sent to the Taker, never used for scoring (that is `ja`) and never shown on the study page.
+   */
+  giverJa?: string;
   /** The id of the question in the source export (used to skip a question that was already imported). */
   sourceId?: string;
 }

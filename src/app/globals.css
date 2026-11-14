@@ -850,3 +850,12 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
   .wb__page { padding-left: 0.75rem; padding-right: 0.75rem; }
 }
 .c-good { color: var(--good); }
+
+/* ---- bank selector on the Pair Game page ------------------------------- */
+.bankhost__source { display: grid; gap: 0.5rem; border: 0; padding: 0; margin: 0; min-width: 0; }
+.bankhost__choice { display: flex; align-items: flex-start; gap: 0.7rem; padding: 0.7rem 0.8rem; min-height: 3.25rem; border: 1px solid var(--line); border-radius: 0.8rem; background: rgb(255 255 255 / 0.03); cursor: pointer; }
+.bankhost__choice--on { border-color: var(--cyan); background: rgb(56 225 255 / 0.08); }
+.bankhost__choice input { width: 1.4rem; height: 1.4rem; margin-top: 0.15rem; flex: none; accent-color: var(--cyan); }
+.bankhost__choice > span { display: grid; gap: 0.1rem; }
+.bankhost__independent { display: grid; gap: 0.7rem; }
+.meaning__ja { font: 600 1.1rem/1.4 var(--body); }
