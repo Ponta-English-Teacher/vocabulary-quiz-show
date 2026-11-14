@@ -5,6 +5,7 @@ import { clampPlayCount } from "@/lib/playCount";
 import { createClassLink } from "@/lib/class/createLink";
 import type { ImportReport } from "@/lib/studio/cqsImport";
 import { bankCategories, bankFromText, bankLevels, clearBank, convertBank, DEFAULT_GAME_WORDS, evaluateSync, filterBank, loadBank, markSynced, MAX_GAME_WORDS, pickForGame, saveBank, type SavedBank, type SyncEvaluation } from "@/lib/studio/cqsBank";
+import { downloadBackup } from "@/lib/studio/backup";
 import { requestLatestBank } from "@/lib/studio/cqsSync";
 import { getBrowserStorage } from "@/lib/studio/storage";
 import { QrCode } from "../QrCode";
@@ -121,6 +122,14 @@ export function BankHost() {
       return;
     }
     accept(ev.incoming);
+  };
+
+  const backup = () => {
+    setError(null);
+    const r = downloadBackup(getBrowserStorage());
+    const c = r.summary;
+    if (!r.ok) setError("The backup could not be downloaded by this browser. Nothing was changed.");
+    else setNotice(`Backup downloaded (${r.filename}): ${c.bankQuestions} bank questions (${c.bankReady} ready, ${c.bankFlagged} flagged, ${c.bankSkipped} skipped) and ${c.activities} saved ${c.activities === 1 ? "activity" : "activities"} with ${c.words} words. Nothing in this browser was changed.`);
   };
 
   const forget = () => {
@@ -284,6 +293,11 @@ export function BankHost() {
           </button>
         </>
       )}
+      <details className="fold">
+        <summary>Backup</summary>
+        <p className="note">Downloads everything saved in this browser (the question bank with its ready/flagged/skipped report, and any saved Studio activities) as one JSON file. It only reads: nothing is changed or removed, and the teacher passcode is not included. Keep the file somewhere safe.</p>
+        <button type="button" className="btn btn--small btn--ghost" onClick={backup}>Export Backup</button>
+      </details>
       {error ? <p className="feedback feedback--wrong" role="alert">{error}</p> : null}
       {notice ? <p className="note" role="status">{notice}</p> : null}
       {links ? (
