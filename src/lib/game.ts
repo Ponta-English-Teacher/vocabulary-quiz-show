@@ -353,6 +353,15 @@ export function redactForTaker(state: GameState): GameState {
       illustration: undefined,
     };
   });
-  // The Giver's Japanese meaning never reaches the Taker: not in play, not at the reveal, not for any word.
-  return { ...state, words: words.map((w) => (w.giverJa === undefined ? w : { ...w, giverJa: undefined })) };
+  // The Giver's Japanese meaning and the spoken opening question never reach the Taker: not in play, not at the reveal, not for any word.
+  // (The Taker must LISTEN to the opening question; the key is removed outright, so it is not even present as undefined text.)
+  return {
+    ...state,
+    words: words.map((w) => {
+      if (w.giverJa === undefined && w.openingQuestion === undefined) return w;
+      const { openingQuestion: _o, ...rest } = w;
+      void _o;
+      return { ...rest, giverJa: undefined };
+    }),
+  };
 }

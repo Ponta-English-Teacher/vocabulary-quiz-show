@@ -33,7 +33,7 @@ export function filterWords(words: readonly BankWord[], f: Filters): BankWord[] 
     (f.status === "all" || w.status === f.status) &&
     (f.cefr === "all" || w.cefr === f.cefr) &&
     (f.category === "all" || w.category === f.category) &&
-    (!q || [w.word, ...w.accept, w.category, w.topic ?? "", w.giverJa ?? ""].some((t) => t.toLowerCase().includes(q))),
+    (!q || [w.word, ...w.accept, w.category, w.topic ?? "", w.giverJa ?? "", w.openingQuestion ?? ""].some((t) => t.toLowerCase().includes(q))),
   );
 }
 
@@ -51,12 +51,12 @@ export function workflowSummary(c: Counts): { step: string; text: string }[] {
 }
 
 export interface WordForm {
-  word: string; accept: string; partOfSpeech: string; cefr: string; category: string; topic: string; giverJa: string; meaning: string; example: string; hints: string[];
+  word: string; accept: string; partOfSpeech: string; cefr: string; category: string; topic: string; giverJa: string; openingQuestion: string; meaning: string; example: string; hints: string[];
 }
-export const blankForm = (): WordForm => ({ word: "", accept: "", partOfSpeech: "noun", cefr: "A2", category: "", topic: "", giverJa: "", meaning: "", example: "", hints: Array(HINT_COUNT).fill("") });
+export const blankForm = (): WordForm => ({ word: "", accept: "", partOfSpeech: "noun", cefr: "A2", category: "", topic: "", giverJa: "", openingQuestion: "", meaning: "", example: "", hints: Array(HINT_COUNT).fill("") });
 
 export const formFromWord = (w: BankWord): WordForm => ({
-  word: w.word, accept: w.accept.join("; "), partOfSpeech: w.partOfSpeech, cefr: w.cefr, category: w.category, topic: w.topic ?? "", giverJa: w.giverJa ?? "",
+  word: w.word, accept: w.accept.join("; "), partOfSpeech: w.partOfSpeech, cefr: w.cefr, category: w.category, topic: w.topic ?? "", giverJa: w.giverJa ?? "", openingQuestion: w.openingQuestion ?? "",
   meaning: w.meaning ?? "", example: w.example ?? "", hints: [...w.hints, "", "", "", ""].slice(0, HINT_COUNT),
 });
 
@@ -65,16 +65,25 @@ export const parseAccept = (s: string): string[] => s.split(/[;\n]/).map((x) => 
 
 /** What the server receives. Optional text left empty is sent as "" so it clears the field. */
 export const payloadFromForm = (f: WordForm) => ({
-  word: f.word, accept: parseAccept(f.accept), partOfSpeech: f.partOfSpeech, cefr: f.cefr, category: f.category, topic: f.topic, giverJa: f.giverJa, meaning: f.meaning, example: f.example, hints: f.hints,
+  word: f.word, accept: parseAccept(f.accept), partOfSpeech: f.partOfSpeech, cefr: f.cefr, category: f.category, topic: f.topic, giverJa: f.giverJa, openingQuestion: f.openingQuestion, meaning: f.meaning, example: f.example, hints: f.hints,
 });
 
 /** Live checks while typing, with the same rules the server applies at approval. */
 export function issuesForForm(f: WordForm): { errors: BankIssue[]; warnings: BankIssue[] } {
   return issuesOf({
     word: f.word, accept: parseAccept(f.accept), partOfSpeech: f.partOfSpeech as BankDraft["partOfSpeech"], cefr: f.cefr as CefrLevel, category: f.category,
-    topic: f.topic || undefined, giverJa: f.giverJa || undefined, meaning: f.meaning || undefined, example: f.example || undefined, hints: f.hints,
+    topic: f.topic || undefined, giverJa: f.giverJa || undefined, openingQuestion: f.openingQuestion || undefined, meaning: f.meaning || undefined, example: f.example || undefined, hints: f.hints,
   });
 }
+
+/** Short, natural examples for the editor. These name the KIND of thing (conceptual), never the grammar (noun / verb / adjective). */
+export const OPENING_EXAMPLES = [
+  "This is a fruit. What is it?",
+  "This is a tool. What is it?",
+  "This is an action. What is it?",
+  "This describes a feeling. What is it?",
+  "This is a concept. What is it?",
+] as const;
 
 export const spokenWordCount = (s: string): number => s.trim().split(/\s+/).filter(Boolean).length;
 

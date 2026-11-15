@@ -859,3 +859,9 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .bankhost__choice > span { display: grid; gap: 0.1rem; }
 .bankhost__independent { display: grid; gap: 0.7rem; }
 .meaning__ja { font: 600 1.1rem/1.4 var(--body); }
+
+/* Spoken opening question: the Giver's "SAY THIS FIRST" card (never rendered for the Taker) */
+.say-first { margin: 0.75rem 0; padding: 0.9rem 1rem; border-radius: 14px; border: 2px solid var(--gold, #f5b83d); background: rgba(245, 184, 61, 0.12); }
+.say-first__tag { margin: 0 0 0.25rem; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.12em; color: var(--gold, #f5b83d); }
+.say-first__text { margin: 0; font-size: 1.45rem; font-weight: 700; line-height: 1.3; }
+.wb__chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }

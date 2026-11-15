@@ -29,6 +29,7 @@ export function toVocabWord(w: BankWord): VocabWord {
     example: w.example ?? "",
     hints: [...w.hints],
     ...(w.giverJa ? { giverJa: w.giverJa } : {}),
+    ...(w.openingQuestion ? { openingQuestion: w.openingQuestion } : {}),
     source: BANK_SOURCE,
     sourceId: w.id,
   };

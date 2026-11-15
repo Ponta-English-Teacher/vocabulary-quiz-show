@@ -23,6 +23,7 @@ export interface ImportCandidate {
   cefr: CefrLevel;
   topic?: string;
   giverJa?: string;
+  openingQuestion?: string;
   meaning?: string;
   example?: string;
   hints: string[];
@@ -171,6 +172,7 @@ export function toCandidate(raw: Raw): { candidate: ImportCandidate | null; erro
   while (hintsRaw.length > HINT_COUNT && !hintsRaw[hintsRaw.length - 1]) hintsRaw.pop();
   const ja = first(raw, "giverja", "japanese", "ja", "japanesemeaning");
   const giverJa = Array.isArray(ja) ? ja.map(clean).filter(Boolean).join("、") : clean(ja);
+  const openingQuestion = clean(first(raw, "openingquestion", "spokenopeningquestion", "opening", "spokenopening"));
   // Provenance is preserved when the file says so. A bare `id` only counts as a source id for words that came from Classroom Quiz Show.
   const source: BankWord["source"] = clean(raw.source) === "classroom-quiz-show" ? "classroom-quiz-show" : "file";
   const sourceId = clean(raw.sourceid || (source === "classroom-quiz-show" ? raw.id : "")).slice(0, 80);
@@ -185,6 +187,7 @@ export function toCandidate(raw: Raw): { candidate: ImportCandidate | null; erro
     cefr: cefr ?? "A1",
     ...(clean(raw.topic) ? { topic: clean(raw.topic) } : {}),
     ...(giverJa ? { giverJa } : {}),
+    ...(openingQuestion ? { openingQuestion } : {}),
     ...(clean(raw.meaning) ? { meaning: clean(raw.meaning) } : {}),
     ...(clean(raw.example) ? { example: clean(raw.example) } : {}),
     hints: hintsRaw,
@@ -266,6 +269,7 @@ export function draftsFromAnalysis(analysis: ImportAnalysis, now: string, makeId
       cefr: c.cefr,
       ...(c.topic ? { topic: c.topic } : {}),
       ...(c.giverJa ? { giverJa: c.giverJa } : {}),
+      ...(c.openingQuestion ? { openingQuestion: c.openingQuestion } : {}),
       ...(c.meaning ? { meaning: c.meaning } : {}),
       ...(c.example ? { example: c.example } : {}),
       hints: [c.hints[0], c.hints[1], c.hints[2], c.hints[3]] as BankWord["hints"],

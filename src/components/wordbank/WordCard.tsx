@@ -34,6 +34,7 @@ export function WordCard({ word: w, selected, busy, onSelect, onEdit, onApprove,
       </div>
       {w.accept.length ? <p className="note">Also accepted: {w.accept.join(", ")}</p> : null}
       {w.giverJa ? <p className="wb__ja"><span className="wb__ja-label">Japanese meaning · Giver only</span> {w.giverJa}</p> : null}
+      {w.openingQuestion ? <p className="wb__ja"><span className="wb__ja-label">Spoken opening question · Giver only</span> {w.openingQuestion}</p> : null}
       <HintList hints={w.hints} />
       <p className="note wb__source">{source}{w.sourceId ? ` · ${w.sourceId}` : ""}</p>
       {w.status !== "archived" ? <IssueLists errors={errors} warnings={warnings} /> : null}

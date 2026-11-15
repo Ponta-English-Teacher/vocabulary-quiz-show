@@ -56,6 +56,14 @@ export function GiverRound({
         <b>Explain the word in English.</b> Don&apos;t say or spell the word.
       </p>
 
+      {word.openingQuestion ? (
+        <section className="say-first" aria-label="Say this first">
+          <p className="say-first__tag">SAY THIS FIRST</p>
+          <p className="say-first__text">{word.openingQuestion}</p>
+          <p className="note">Free. It is not a hint and does not change the points. {taker} cannot see it: they listen.</p>
+        </section>
+      ) : null}
+
       {opening ? (
         <section className="clues" aria-label="Opening hint">
           <p className="clue clue--opening">

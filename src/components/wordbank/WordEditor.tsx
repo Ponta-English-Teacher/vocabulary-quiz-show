@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { CEFR_LEVELS, PARTS_OF_SPEECH } from "@/data/vocab";
 import { BANK_LIMITS } from "@/lib/bank/validate";
-import { HINT_ROLES, issuesForForm, spokenWordCount, type WordForm } from "@/lib/bank/view";
+import { HINT_ROLES, OPENING_EXAMPLES, issuesForForm, spokenWordCount, type WordForm } from "@/lib/bank/view";
 import { IssueLists } from "./Issues";
 
 /** Edit or create one word: every field, four hints in order, and live problems (separate from review notes). Saving never approves. */
@@ -44,6 +44,13 @@ export function WordEditor({ title, initial, submitLabel, busy, serverError, not
       <label className="field"><span className="field__label">Japanese meaning (optional · shown to the Giver only)</span>
         <input value={f.giverJa} maxLength={BANK_LIMITS.giverJa} onChange={(e) => set("giverJa", e.target.value)} lang="ja" placeholder="水切りざる" />
         <span className="note">Helps the Giver confirm the meaning. It is never shown to the Taker and never used for scoring.</span></label>
+
+      <label className="field wb__opening"><span className="field__label">Spoken Opening Question (optional · Giver says it first · never shown to the Taker)</span>
+        <input value={f.openingQuestion} maxLength={BANK_LIMITS.openingQuestion + 20} onChange={(e) => set("openingQuestion", e.target.value)} placeholder="This is an action. What is it?" />
+        <span className="note">Say what KIND of thing it is (a fruit, a tool, an action, a feeling, a concept), not its grammar (noun, verb, adjective). It is free: it is not one of the four hints and does not change the score.</span>
+        <span className="wb__chips" role="group" aria-label="Opening question examples">
+          {OPENING_EXAMPLES.map((x) => <button key={x} type="button" className="btn btn--small btn--ghost" onClick={() => set("openingQuestion", x)}>{x}</button>)}
+        </span></label>
 
       <fieldset className="wb__hintset">
         <legend className="field__label">Four hints — from least to most helpful</legend>

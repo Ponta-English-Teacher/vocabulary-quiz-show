@@ -50,7 +50,7 @@ function coerce(patch: unknown): { out: Parameters<typeof editWord>[1] } | Servi
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) return fail("bad_request", "Nothing to change.");
   const p = patch as Record<string, unknown>;
   const out: Parameters<typeof editWord>[1] = {};
-  for (const k of ["word", "category", "topic", "giverJa", "meaning", "example"] as const) {
+  for (const k of ["word", "category", "topic", "giverJa", "openingQuestion", "meaning", "example"] as const) {
     if (!(k in p)) continue;
     const v = textOrUndef(p[k]);
     if (v === "bad") return fail("bad_request", `${k} must be text.`);
@@ -217,7 +217,7 @@ export class BankService {
     const now = this.now();
     const w: BankWord = {
       id: this.makeId(), word: o.word, accept: o.accept ?? [], partOfSpeech: o.partOfSpeech, category: o.category, cefr: o.cefr,
-      ...(o.topic ? { topic: o.topic } : {}), ...(o.giverJa ? { giverJa: o.giverJa } : {}), ...(o.meaning ? { meaning: o.meaning } : {}), ...(o.example ? { example: o.example } : {}),
+      ...(o.topic ? { topic: o.topic } : {}), ...(o.giverJa ? { giverJa: o.giverJa } : {}), ...(o.openingQuestion ? { openingQuestion: o.openingQuestion } : {}), ...(o.meaning ? { meaning: o.meaning } : {}), ...(o.example ? { example: o.example } : {}),
       hints: hints as unknown as BankWord["hints"], status: "draft", source: "manual", createdAt: now, updatedAt: now,
     };
     if (complete(w) && !(await this.claim(w))) return fail("conflict", "An identical word (same word, level and hints) is already in the bank.");

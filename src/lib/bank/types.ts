@@ -31,6 +31,11 @@ export interface BankWord {
   topic?: string;
   /** Optional Japanese meaning for the GIVER only. Never sent to the Taker, never used for scoring. */
   giverJa?: string;
+  /**
+   * Optional SPOKEN opening question, e.g. "This is an action. What is it?". The Giver sees it ("SAY THIS FIRST") and says it aloud before any hint.
+   * It is free: not one of the four hints, never scored, and NEVER sent to the Taker (they must listen).
+   */
+  openingQuestion?: string;
   /** Optional plain-English meaning and example for the Giver. */
   meaning?: string;
   example?: string;
@@ -53,7 +58,7 @@ export interface BankIssue {
   severity: Severity;
   /** Machine-readable reason. */
   code: string;
-  field: "word" | "accept" | "partOfSpeech" | "cefr" | "category" | "topic" | "giverJa" | "meaning" | "example" | "hints" | "status";
+  field: "word" | "accept" | "partOfSpeech" | "cefr" | "category" | "topic" | "giverJa" | "openingQuestion" | "meaning" | "example" | "hints" | "status";
   /** 0-based hint position, for hint problems. */
   hintIndex?: number;
   message: string;

@@ -16,6 +16,7 @@ export const TEMPLATE_ROWS = [
     level: "B1",
     topic: "Cooking",
     giverJa: "水切りざる",
+    openingQuestion: "This is a kitchen tool. What is it?",
     meaning: "A bowl with holes that you use to drain water from food.",
     example: "Pour the pasta into the colander.",
     hints: [
@@ -33,6 +34,7 @@ export const TEMPLATE_ROWS = [
     level: "B1",
     topic: "Body and mind",
     giverJa: "ぐったり疲れた",
+    openingQuestion: "This describes a feeling. What is it?",
     hints: [
       "Imagine you ran a long way, or worked all day without a break.",
       "At the end, you cannot move much and you want to lie down.",
@@ -44,14 +46,14 @@ export const TEMPLATE_ROWS = [
 
 export const templateJson = (): string => JSON.stringify({ format: BANK_FORMAT, version: BANK_VERSION, words: TEMPLATE_ROWS }, null, 2) + "\n";
 
-export const CSV_COLUMNS = ["word", "accept", "partOfSpeech", "category", "level", "topic", "giverJa", "meaning", "example", "hint1", "hint2", "hint3", "hint4"] as const;
+export const CSV_COLUMNS = ["word", "accept", "partOfSpeech", "category", "level", "topic", "giverJa", "openingQuestion", "meaning", "example", "hint1", "hint2", "hint3", "hint4"] as const;
 
 const csvCell = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
 export function templateCsv(): string {
   const rows = TEMPLATE_ROWS.map((r) => {
-    const w = r as unknown as { word: string; accept: readonly string[]; partOfSpeech: string; category: string; level: string; topic?: string; giverJa?: string; meaning?: string; example?: string; hints: readonly string[] };
-    return [w.word, w.accept.join(";"), w.partOfSpeech, w.category, w.level, w.topic ?? "", w.giverJa ?? "", w.meaning ?? "", w.example ?? "", ...w.hints].map(csvCell).join(",");
+    const w = r as unknown as { word: string; accept: readonly string[]; partOfSpeech: string; category: string; level: string; topic?: string; giverJa?: string; openingQuestion?: string; meaning?: string; example?: string; hints: readonly string[] };
+    return [w.word, w.accept.join(";"), w.partOfSpeech, w.category, w.level, w.topic ?? "", w.giverJa ?? "", w.openingQuestion ?? "", w.meaning ?? "", w.example ?? "", ...w.hints].map(csvCell).join(",");
   });
   return [CSV_COLUMNS.join(","), ...rows].join("\r\n") + "\r\n";
 }
@@ -81,6 +83,8 @@ export interface PromptOptions {
   existingWords?: readonly string[];
   /** Include a Japanese meaning for the Giver. Default true. */
   giverJa?: boolean;
+  /** Include a spoken opening question for the Giver. Default true. */
+  openingQuestion?: boolean;
 }
 
 /** A ready-to-paste prompt that makes ChatGPT or Claude produce a file the VQS importer accepts. */
@@ -89,6 +93,7 @@ export function buildGenerationPrompt(o: PromptOptions): string {
   const level = o.level === "Mixed" ? `Spread the words across CEFR levels ${CEFR_LEVELS.join(", ")}.` : `Every word is CEFR level ${o.level}: write the hints in English a ${o.level} learner can understand (${LEVEL_NOTES[o.level]}).`;
   const avoid = (o.existingWords ?? []).map((w) => w.trim()).filter(Boolean).slice(0, 300);
   const ja = o.giverJa !== false;
+  const oq = o.openingQuestion !== false;
   const example = o.format === "json" ? JSON.stringify(TEMPLATE_ROWS[0], null, 2) : `${CSV_COLUMNS.join(",")}\n${templateCsv().split("\r\n")[1]}`;
   const output = o.format === "json"
     ? "Return ONLY a JSON array of word objects. No introduction, no markdown code fences, no comments."
@@ -101,7 +106,7 @@ How the game works: two students play on two phones. The GIVER sees the target w
 Write ${o.size} words${topic ? ` about "${topic}"` : " on a variety of everyday and school-life topics"}.
 ${level}
 
-Each word has FOUR hints:
+${oq ? `Before any hint, the Giver says a short SPOKEN OPENING QUESTION aloud, so the Taker knows what KIND of thing to look for. It is free and is not one of the hints. Write it as: "This is a/an ___. What is it?" naming the kind of thing in everyday words, NOT its grammar. Good examples: "This is a fruit. What is it?", "This is a tool. What is it?", "This is an action. What is it?", "This describes a feeling. What is it?", "This is a concept. What is it?". Do not write "This is a noun / verb / adjective." The opening question must never contain the target word or give a hint of its own.\n\n` : ""}Each word has FOUR hints:
 - Hint 1 (free, the opening): a situation or scene the Giver can start talking about. It is the LEAST helpful hint but must not be vague or obscure. Not a bare label ("It is a kitchen tool."), and avoid numbers, dates and trivia.
 - Hint 2: one more concrete detail (what it looks like, what happens, who uses it).
 - Hint 3: a clearer clue, such as how it is used or a contrast.
@@ -117,7 +122,7 @@ Each word also needs:
 - category: a short topic label (maximum ${BANK_LIMITS.category} characters)
 - level: ${CEFR_LEVELS.join(", ")}
 - topic: optional, a narrower topic
-${ja ? `- giverJa: a SHORT natural Japanese equivalent (maximum ${BANK_LIMITS.giverJa} characters). It is shown to the Giver only, to confirm the meaning. Never put it in a hint.\n` : ""}- meaning: optional, a one-sentence plain-English meaning for the Giver
+${oq ? `- openingQuestion: a SHORT spoken question (about 5 to ${BANK_LIMITS.openingWordsMax} words, maximum ${BANK_LIMITS.openingQuestion} characters) that names the kind of thing. It is shown to the Giver only (as "say this first") and is never shown to the Taker.\n` : ""}${ja ? `- giverJa: a SHORT natural Japanese equivalent (maximum ${BANK_LIMITS.giverJa} characters). It is shown to the Giver only, to confirm the meaning. Never put it in a hint.\n` : ""}- meaning: optional, a one-sentence plain-English meaning for the Giver
 - example: optional, one example sentence for the Giver
 - Do NOT include a status field: every word starts as a draft and the teacher approves it.
 
@@ -125,7 +130,7 @@ Rules:
 - Choose useful words students are likely to meet and can explain in English. Avoid people's names, brands, titles, and words that need a picture.
 - Do not repeat a word within this list.${avoid.length ? `\n- Do not use any of these words, which are already in the bank: ${avoid.join(", ")}.` : ""}
 
-Before you answer, check EVERY word and fix any problem: (1) no hint contains the word or a form of it; (2) hints get steadily more helpful; (3) no hint repeats another; (4) every hint is a short sentence a student can say; (5) every fact is true; (6) the level suits the learners. Do not show this check. Output only the final file.
+Before you answer, check EVERY word and fix any problem: (1) no hint or opening question contains the word or a form of it; (2) hints get steadily more helpful; (3) no hint repeats another; (4) every hint is a short sentence a student can say; (5) every fact is true; (6) the level suits the learners. Do not show this check. Output only the final file.
 
 ${output}
 

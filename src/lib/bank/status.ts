@@ -16,7 +16,7 @@ export function approveWord(w: BankWord, now: string, others: readonly BankWord[
 }
 
 /** Editing content always returns a word to draft: a changed word has not been approved. */
-export function editWord(w: BankWord, patch: Partial<Pick<BankWord, "word" | "accept" | "partOfSpeech" | "category" | "cefr" | "topic" | "giverJa" | "meaning" | "example" | "hints">>, now: string): BankWord {
+export function editWord(w: BankWord, patch: Partial<Pick<BankWord, "word" | "accept" | "partOfSpeech" | "category" | "cefr" | "topic" | "giverJa" | "openingQuestion" | "meaning" | "example" | "hints">>, now: string): BankWord {
   const { approvedAt: _a, ...rest } = w;
   void _a;
   return { ...rest, ...patch, status: w.status === "archived" ? "archived" : "draft", updatedAt: now };

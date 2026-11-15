@@ -291,6 +291,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
   const illustration = coerceIllustration(r.illustration);
   const askKind = coerceAskKind(r.askKind);
   const giverJa = str(r.giverJa).slice(0, 60);
+  const openingQuestion = str(r.openingQuestion).slice(0, 120);
 
   if (errors.length || !pos || !cefr) return { errors };
   return {
@@ -311,6 +312,7 @@ export function coerceWord(raw: unknown, opts: { id?: string } = {}): CoerceResu
       ...(illustration ? { illustration } : {}),
       ...(imported ? { source: r.source as typeof IMPORT_SOURCE | typeof BANK_SOURCE, ...(sourceId ? { sourceId } : {}) } : {}),
       ...(giverJa ? { giverJa } : {}),
+      ...(openingQuestion ? { openingQuestion } : {}),
     },
   };
 }

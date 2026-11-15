@@ -76,6 +76,11 @@ export interface VocabWord {
    * never sent to the Taker, never used for scoring (that is `ja`) and never shown on the study page.
    */
   giverJa?: string;
+  /**
+   * Optional SPOKEN opening question for the GIVER only ("This is an action. What is it?"), shown as "SAY THIS FIRST" above the hints.
+   * Free: not a hint, not scored, no effect on the one-hint delay. Never sent to the Taker (redactForTaker), not even after a reconnect.
+   */
+  openingQuestion?: string;
   /** The id of the question in the source export (used to skip a question that was already imported). */
   sourceId?: string;
 }

@@ -11,6 +11,9 @@ export const BANK_LIMITS = {
   category: 60,
   topic: 60,
   giverJa: 60,
+  openingQuestion: 120,
+  /** Comfortable spoken length for the opening question, in words. */
+  openingWordsMax: 14,
   meaning: 300,
   example: 300,
   hintMax: 200,
@@ -27,6 +30,8 @@ const MARKUP = /<\s*\/?\s*(script|iframe|style|img|a|div|span)\b|javascript:/i;
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 const JAPANESE = /[぀-ヿ㐀-䶿一-鿿]/;
+/** Grammar words: an opening question names the kind of thing (a fruit, an action), not its part of speech. */
+const GRAMMAR_LABEL = /\b(nouns?|verbs?|adjectives?|adverbs?|gerunds?|participles?|part of speech)\b/i;
 const STOP = new Set(["the", "a", "an", "it", "is", "are", "you", "to", "of", "and", "in", "on", "at", "for", "with", "this", "that", "can", "or", "your", "when", "people"]);
 
 const wordsOf = (s: string) => s.trim().split(/\s+/).filter(Boolean);
@@ -41,7 +46,7 @@ function overlap(a: string, b: string): number {
 }
 
 export type BankDraft = Pick<BankWord, "word" | "accept" | "partOfSpeech" | "category" | "cefr"> & { hints: readonly string[] } &
-  Partial<Pick<BankWord, "topic" | "giverJa" | "meaning" | "example" | "status">>;
+  Partial<Pick<BankWord, "topic" | "giverJa" | "openingQuestion" | "meaning" | "example" | "status">>;
 
 /** All content checks for one word. Errors block approval; warnings are for the teacher's judgement. */
 export function validateBankWord(w: BankDraft): BankIssue[] {
@@ -84,6 +89,17 @@ export function validateBankWord(w: BankDraft): BankIssue[] {
   if (w.giverJa?.trim()) {
     text(w.giverJa, "giverJa", "The Japanese meaning", BANK_LIMITS.giverJa);
     if (!JAPANESE.test(w.giverJa)) warn("giverja_not_japanese", "giverJa", "The Japanese meaning contains no Japanese characters.");
+  }
+
+  // Spoken opening question (optional): said aloud BEFORE the hints, so it must not give the answer away.
+  if (w.openingQuestion?.trim()) {
+    const q = w.openingQuestion;
+    text(q, "openingQuestion", "The spoken opening question", BANK_LIMITS.openingQuestion);
+    if (w.word?.trim() && leaksTarget({ word: w.word, accept }, q)) err("leak", "openingQuestion", "The spoken opening question contains the answer (or a form of it).");
+    const n = wordsOf(q).length;
+    if (n > BANK_LIMITS.openingWordsMax) warn("opening_long", "openingQuestion", `The opening question is long to say aloud (${n} words). Keep it short, like "This is an action. What is it?"`);
+    if (GRAMMAR_LABEL.test(q)) warn("opening_grammar", "openingQuestion", "Say what KIND OF THING it is (a fruit, a tool, an action, a feeling, a concept), not its grammar (noun, verb, adjective).");
+    if (!/[?？]/.test(q)) warn("opening_no_question", "openingQuestion", 'The opening usually ends with a question, such as "What is it?"');
   }
 
   // Hints: exactly four, each a short spoken line
