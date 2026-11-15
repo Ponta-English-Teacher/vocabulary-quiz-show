@@ -15,6 +15,7 @@ import { BANK_STATUSES, type BankStatus } from "./types";
  *   PATCH  /api/wordbank/<id>     {patch}             edit (returns the word to draft)
  *   POST   /api/wordbank/<id>/approve | archive | restore
  *   POST   /api/wordbank/approve-many   {ids}
+ *   POST   /api/wordbank/archive-drafts {ids}   archive several DRAFTS (all-or-nothing; approved/archived are refused)
  */
 export interface WordbankDeps {
   env: TeacherEnv;
@@ -104,7 +105,13 @@ async function route(request: Request, path: string[], service: BankService): Pr
     const r = await service.approveMany(b.ids);
     return r.ok ? json(r) : fromService(r);
   }
-  if (a && ID.test(a) && a !== "import" && a !== "export" && a !== "approve-many") {
+  if (a === "archive-drafts" && path.length === 1 && method === "POST") {
+    const b = await body(request);
+    if (!b) return err(400, "bad_request", "Invalid request.");
+    const r = await service.archiveDrafts(b.ids);
+    return r.ok ? json(r) : err(r.code === "conflict" ? 409 : 400, r.code, r.message);
+  }
+  if (a && ID.test(a) && a !== "import" && a !== "export" && a !== "approve-many" && a !== "archive-drafts") {
     if (path.length === 1 && method === "PATCH") {
       const b = await body(request);
       if (!b) return err(400, "bad_request", "Invalid request.");

@@ -264,7 +264,7 @@ const call = (deps: WordbankDeps, method: string, path: string[], opts: { body?:
 describe("teacher authentication", () => {
   const ROUTES: [string, string[], unknown?][] = [
     ["GET", []], ["GET", ["export"]], ["POST", ["import"], { text: "[]" }], ["PATCH", ["bid1"], { patch: {} }],
-    ["POST", ["bid1", "approve"]], ["POST", ["bid1", "archive"]], ["POST", ["bid1", "restore"]], ["POST", ["approve-many"], { ids: ["a"] }],
+    ["POST", ["bid1", "approve"]], ["POST", ["bid1", "archive"]], ["POST", ["bid1", "restore"]], ["POST", ["approve-many"], { ids: ["a"] }], ["POST", ["archive-drafts"], { ids: ["a"] }],
   ];
   it("every operation refuses a missing or wrong passcode, and opens no storage", async () => {
     const { deps, store, opened } = mkDeps();

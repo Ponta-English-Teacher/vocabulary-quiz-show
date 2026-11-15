@@ -85,6 +85,13 @@ export const OPENING_EXAMPLES = [
   "This is a concept. What is it?",
 ] as const;
 
+/** The exact wording of the confirmation shown before several drafts are archived. */
+export const archiveConfirmMessage = (n: number): string =>
+  `Archive ${n} selected draft${n === 1 ? "" : "s"}?\n\nThey will no longer appear in the draft list and can never be played. You can restore them later (they come back as drafts). Approved words are not affected.`;
+
+/** The selected words that may be bulk-archived: drafts only (approved and archived words are never included). */
+export const archivableDrafts = (words: readonly BankWord[], selected: ReadonlySet<string>): BankWord[] => words.filter((w) => selected.has(w.id) && w.status === "draft");
+
 export const spokenWordCount = (s: string): number => s.trim().split(/\s+/).filter(Boolean).length;
 
 /** A download in the browser. Returns false if the browser could not do it. */

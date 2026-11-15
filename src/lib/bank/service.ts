@@ -275,6 +275,34 @@ export class BankService {
     return { ok: true, approved, failed };
   }
 
+  /**
+   * Archive several DRAFTS at once. All-or-nothing: if ANY id is missing, approved or already archived, nothing is changed and every problem is
+   * reported. Only status and the duplicate-check claim change (the same as archiving one draft); hints, import history and approved words are untouched.
+   */
+  async archiveDrafts(ids: unknown): Promise<{ ok: true; archived: string[] } | { ok: false; code: "bad_request" | "conflict"; message: string; rejected: { id: string; message: string }[] }> {
+    const bad = (message: string) => ({ ok: false as const, code: "bad_request" as const, message, rejected: [] });
+    if (!Array.isArray(ids) || !ids.length || ids.some((i) => typeof i !== "string")) return bad("Choose at least one draft.");
+    const unique = [...new Set(ids as string[])];
+    if (unique.length > MAX_APPROVE_MANY) return bad(`Archive at most ${MAX_APPROVE_MANY} drafts at a time.`);
+    const { words } = await this.readAll();
+    const byId = new Map(words.map((w) => [w.id, w]));
+    const rejected: { id: string; message: string }[] = [];
+    for (const id of unique) {
+      const w = byId.get(id);
+      if (!w) rejected.push({ id, message: "That word does not exist." });
+      else if (w.status !== "draft") rejected.push({ id, message: `“${w.word}” is ${w.status}, not a draft, so it was not archived.` });
+    }
+    if (rejected.length) return { ok: false, code: "conflict", message: `Nothing was archived: ${rejected.length} of the ${unique.length} selected ${rejected.length === 1 ? "is" : "are"} not a draft. ${rejected[0].message}`, rejected };
+    const archived: string[] = [];
+    for (const id of unique) {
+      const w = byId.get(id)!;
+      await this.save(archiveWord(w, this.now()));
+      await this.release(w);
+      archived.push(id);
+    }
+    return { ok: true, archived };
+  }
+
   async archive(id: string): Promise<{ ok: true; word: BankWord } | ServiceError> {
     const w = await this.load(id);
     if (!w) return fail("not_found", "That word does not exist.");

@@ -55,6 +55,7 @@ export const makeApi = (deps: ApiDeps = {}) => ({
   edit: (id: string, patch: unknown) => call<{ word: BankWord; issues: BankIssue[] }>(deps, "PATCH", `/${encodeURIComponent(id)}`, { patch }),
   approve: (id: string) => call<{ word: BankWord }>(deps, "POST", `/${encodeURIComponent(id)}/approve`, {}),
   approveMany: (ids: string[]) => call<{ approved: string[]; failed: { id: string; message: string }[] }>(deps, "POST", "/approve-many", { ids }),
+  archiveDrafts: (ids: string[]) => call<{ archived: string[] }>(deps, "POST", "/archive-drafts", { ids }),
   archive: (id: string) => call<{ word: BankWord }>(deps, "POST", `/${encodeURIComponent(id)}/archive`, {}),
   restore: (id: string) => call<{ word: BankWord }>(deps, "POST", `/${encodeURIComponent(id)}/restore`, {}),
   /** The whole bank as JSON text (for a file download). */

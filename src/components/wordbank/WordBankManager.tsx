@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { makeApi, type Counts } from "@/lib/bank/client";
 import type { BankWord } from "@/lib/bank/types";
-import { DEFAULT_FILTERS, STATUS_LABEL, blankForm, canApprove, categoriesOf, filterWords, formFromWord, levelsOf, payloadFromForm, workflowSummary, type Filters, type WordForm } from "@/lib/bank/view";
+import { DEFAULT_FILTERS, STATUS_LABEL, archivableDrafts, archiveConfirmMessage, blankForm, canApprove, categoriesOf, filterWords, formFromWord, levelsOf, payloadFromForm, workflowSummary, type Filters, type WordForm } from "@/lib/bank/view";
 import { clearPasscode, teacherHeaders } from "@/lib/teacher/client";
 import { TeacherPasscodeForm } from "../TeacherPasscodeForm";
 import { useTeacherAccess } from "../useTeacherAccess";
@@ -52,6 +52,8 @@ export function WordBankManager() {
   const visible = useMemo(() => filterWords(words, filters), [words, filters]);
   const approvable = useMemo(() => visible.filter(canApprove), [visible]);
   const chosen = useMemo(() => words.filter((w) => selected.has(w.id) && canApprove(w)), [words, selected]);
+  const drafts = useMemo(() => visible.filter((w) => w.status === "draft"), [visible]);
+  const archivable = useMemo(() => archivableDrafts(words, selected), [words, selected]);
   const setFilter = <K extends keyof Filters>(k: K, v: Filters[K]) => { setFilters((p) => ({ ...p, [k]: v })); setShown(PAGE); };
 
   const replace = (w: BankWord) => setWords((p) => p.map((x) => (x.id === w.id ? w : x)));
@@ -82,6 +84,20 @@ export function WordBankManager() {
     setSelected(new Set());
     setNotice(`Approved ${r.data.approved.length} word${r.data.approved.length === 1 ? "" : "s"}.${r.data.failed.length ? ` ${r.data.failed.length} could not be approved: ${r.data.failed.slice(0, 3).map((f) => f.message).join(" ")}` : ""}`);
   });
+
+  const archiveSelected = () => {
+    const n = archivable.length;
+    if (!n) return;
+    // Exact number in the confirmation. Cancelling changes nothing.
+    if (typeof window !== "undefined" && !window.confirm(archiveConfirmMessage(n))) return;
+    void act(async () => {
+      const r = await api.archiveDrafts(archivable.map((w) => w.id));
+      if (!r.ok) { await load(); return setError(r.message); }
+      await load(); // refreshes the draft and archived counts
+      setSelected(new Set());
+      setNotice(`Archived ${r.data.archived.length} draft${r.data.archived.length === 1 ? "" : "s"}. They can be restored from the Archived list (they come back as drafts).`);
+    });
+  };
 
   const saveEdit = (form: WordForm) => act(async () => {
     if (!editing) return;
@@ -166,7 +182,9 @@ export function WordBankManager() {
             <div className="wb__bulk">
               <button type="button" className="btn btn--small btn--ghost" disabled={busy || !approvable.length} onClick={() => setSelected(new Set(approvable.slice(0, 200).map((w) => w.id)))}>Select all {Math.min(approvable.length, 200)} approvable drafts shown</button>
               <button type="button" className="btn btn--small btn--ghost" disabled={busy || !selected.size} onClick={() => setSelected(new Set())}>Clear selection</button>
+              <button type="button" className="btn btn--small btn--ghost" disabled={busy || !drafts.length} onClick={() => setSelected(new Set(drafts.slice(0, 200).map((w) => w.id)))}>Select all {Math.min(drafts.length, 200)} drafts shown</button>
               <button type="button" className="btn btn--small" disabled={busy || !chosen.length} onClick={approveSelected}>Approve selected ({chosen.length})</button>
+              <button type="button" className="btn btn--small wb__danger" disabled={busy || !archivable.length} onClick={archiveSelected}>Archive Selected Drafts ({archivable.length})</button>
             </div>
           ) : null}
           <p className="note" role="status">{visible.length} word{visible.length === 1 ? "" : "s"} match.{filters.status === "draft" ? " Only drafts without errors can be approved; you decide which." : ""}</p>
