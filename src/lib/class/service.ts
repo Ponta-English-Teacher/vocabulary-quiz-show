@@ -4,6 +4,7 @@ import type { Illustration, VocabWord } from "@/data/vocab";
 import { generateIllustration, IllustrateError } from "@/lib/studio/illustration";
 import { translateJapanese } from "@/lib/studio/ai/japanese";
 import { DEFAULT_MODEL } from "@/lib/studio/ai/openai";
+import { openAIKey } from "@/lib/studio/ai/guard";
 import type { ClassView } from "./types";
 import {
   applyAction, buildView, claimSeat, cleanName, cloneRoom, fail, hashToken, markIllustration, newRoom, normalizeGroup, other, parseAction,
@@ -472,15 +473,15 @@ export function getClassService(): ClassService {
 }
 
 /** Production translator: the existing OpenAI setup, read from the server environment at call time. Absent key → no translation (and no cost). */
-const envTranslator: StudyTranslator | undefined = (words) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+export const envTranslator: StudyTranslator | undefined = (words) => {
+  const apiKey = openAIKey(); // undefined while OpenAI is switched off (see guard.ts)
   if (!apiKey) return Promise.resolve({});
   return translateJapanese({ apiKey, model: process.env.OPENAI_MODEL || DEFAULT_MODEL }, words);
 };
 
 /** Production drawer: the existing OpenAI image setup, read from the server environment at call time (never sent anywhere else). */
-const envDrawer: Drawer = async (word) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+export const envDrawer: Drawer = async (word) => {
+  const apiKey = openAIKey(); // undefined while OpenAI is switched off (see guard.ts)
   if (!apiKey) throw new IllustrateError("no_ai", "Illustrations need the OpenAI key, which isn't set on this server.");
   return generateIllustration({ apiKey, model: process.env.OPENAI_IMAGE_MODEL, url: process.env.OPENAI_IMAGES_URL }, word);
 };

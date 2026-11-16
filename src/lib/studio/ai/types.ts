@@ -32,7 +32,7 @@ export type StudioData =
   /** Japanese meanings keyed by the normalised English word. Words the AI gave nothing for are absent. */
   | { task: "fill-japanese"; ja: Record<string, string[]> };
 
-export type AiErrorCode = "bad_request" | "malformed" | "upstream" | "timeout" | "unsupported" | "validation";
+export type AiErrorCode = "bad_request" | "malformed" | "upstream" | "timeout" | "unsupported" | "validation" | "disabled";
 
 export type StudioResponse =
   | { ok: true; mode: AiMode; model?: string; data: StudioData }

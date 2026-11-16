@@ -1,4 +1,5 @@
 import { AiError } from "./types";
+import { OPENAI_DISABLED_MESSAGE, openAIEnabled } from "./guard";
 
 export type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
@@ -18,6 +19,8 @@ export const DEFAULT_MODEL = "gpt-4o-mini";
  * error messages deliberately never include upstream response bodies.
  */
 export async function callOpenAIJson(cfg: OpenAIConfig, messages: ChatMsg[]): Promise<unknown> {
+  // Backstop (see guard.ts): with OpenAI switched off, the real network is never used. Only an injected test fetch may run.
+  if (!cfg.fetchImpl && !openAIEnabled()) throw new AiError("disabled", OPENAI_DISABLED_MESSAGE);
   const doFetch: FetchLike = cfg.fetchImpl ?? ((url, init) => fetch(url, init));
   let res: Response;
   try {

@@ -1,6 +1,7 @@
 import { coerceWord } from "@/lib/studio/validation";
 import { generateIllustration, IllustrateError } from "@/lib/studio/illustration";
 import { requireTeacher } from "@/lib/teacher/guard";
+import { OPENAI_DISABLED_MESSAGE, openAIEnabled, openAIKey } from "@/lib/studio/ai/guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -10,7 +11,8 @@ export async function POST(request: Request) {
   const denied = await requireTeacher(request);
   if (denied) return denied;
   const fail = (code: string, message: string, status: number) => Response.json({ ok: false, error: { code, message } }, { status, headers: { "Cache-Control": "no-store" } });
-  const apiKey = process.env.OPENAI_API_KEY;
+  if (!openAIEnabled()) return fail("ai_disabled", `${OPENAI_DISABLED_MESSAGE} The activity is still playable without pictures.`, 503);
+  const apiKey = openAIKey();
   if (!apiKey) return fail("no_ai", "Pictures need the OpenAI key, which isn't set on this server. The activity is still playable without pictures.", 503);
   const text = await request.text();
   if (text.length > 20_000) return fail("bad_request", "Request too large.", 413);

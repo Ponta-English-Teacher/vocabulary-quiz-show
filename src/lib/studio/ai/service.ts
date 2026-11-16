@@ -39,6 +39,7 @@ export function statusFor(code: string): number {
     case "validation": return 502;
     case "malformed": return 502;
     case "timeout": return 504;
+    case "disabled": return 503;
     default: return 502;
   }
 }

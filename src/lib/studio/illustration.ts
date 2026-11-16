@@ -1,5 +1,6 @@
 import type { Illustration, VocabWord } from "@/data/vocab";
 import type { FetchLike } from "./ai/openai";
+import { OPENAI_DISABLED_MESSAGE, openAIEnabled } from "./ai/guard";
 import { isIllustrationSrc } from "./validation";
 
 /**
@@ -42,6 +43,8 @@ export interface IllustrateConfig {
 }
 
 export async function generateIllustration(cfg: IllustrateConfig, w: DrawWord): Promise<Illustration> {
+  // Backstop (see ai/guard.ts): with OpenAI switched off, the real network is never used. Only an injected test fetch may run.
+  if (!cfg.fetchImpl && !openAIEnabled()) throw new IllustrateError("no_ai", OPENAI_DISABLED_MESSAGE);
   const doFetch: FetchLike = cfg.fetchImpl ?? ((url, init) => fetch(url, init));
   let res: Response;
   try {

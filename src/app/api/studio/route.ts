@@ -1,5 +1,6 @@
 import { handleStudioRequest, resolveMode } from "@/lib/studio/ai/service";
 import { DEFAULT_MODEL } from "@/lib/studio/ai/openai";
+import { openAIEnabled, openAIKey } from "@/lib/studio/ai/guard";
 import { requireTeacher } from "@/lib/teacher/guard";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +9,8 @@ const MAX_BODY_CHARS = 60_000;
 
 /** Which AI is active? Never returns the key — only whether one exists. */
 export async function GET() {
-  const mode = resolveMode({ apiKey: process.env.OPENAI_API_KEY });
-  return Response.json({ mode, model: mode === "openai" ? process.env.OPENAI_MODEL || DEFAULT_MODEL : null });
+  const mode = resolveMode({ apiKey: openAIKey() });
+  return Response.json({ mode, model: mode === "openai" ? process.env.OPENAI_MODEL || DEFAULT_MODEL : null, openai: openAIEnabled() ? "enabled" : "disabled" });
 }
 
 export async function POST(request: Request) {
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, mode: "mock", error: { code: "bad_request", message: "Invalid JSON." } }, { status: 400 });
   }
   const { status, body: result } = await handleStudioRequest(body, {
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: openAIKey(), // undefined while OpenAI is switched off: the free mock answers, nothing is sent to OpenAI
     model: process.env.OPENAI_MODEL,
     fillJapanese: true,
   });
