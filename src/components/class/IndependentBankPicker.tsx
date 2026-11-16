@@ -54,7 +54,7 @@ export function IndependentBankPicker({ allowed, onLinks, onCount }: {
     return (
       <div className="bankhost__confirm" role="alert">
         <p className="feedback feedback--wrong">{unavailableMessage("empty")}</p>
-        <div className="bankhost__actions"><a className="btn btn--small" href="/wordbank">Open the Word Bank</a><button type="button" className="btn btn--small btn--ghost" onClick={refresh}>Check again</button></div>
+        <div className="bankhost__actions"><button type="button" className="btn btn--small btn--ghost" onClick={refresh}>Check again</button></div>
       </div>
     );
   }

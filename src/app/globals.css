@@ -857,6 +857,7 @@ textarea:focus, select:focus { outline: none; border-color: var(--gold); box-sha
 .bankhost__choice--on { border-color: var(--cyan); background: rgb(56 225 255 / 0.08); }
 .bankhost__choice input { width: 1.4rem; height: 1.4rem; margin-top: 0.15rem; flex: none; accent-color: var(--cyan); }
 .bankhost__choice > span { display: grid; gap: 0.1rem; }
+.bankhost__manage { justify-self: start; text-decoration: none; }
 .bankhost__independent { display: grid; gap: 0.7rem; }
 .meaning__ja { font: 600 1.1rem/1.4 var(--body); }
 

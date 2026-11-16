@@ -88,6 +88,20 @@ describe("unavailable or empty: a clear error and NEVER another bank", () => {
     expect(render("independent", 518, 5)).toContain("Approved words stored on the server (5 approved)");
     expect(render("current", 518, 5)).not.toContain("(5 approved)");
   });
+  it("Manage Word Bank: always shown below the independent option, either bank selected, any word count; same tab", () => {
+    for (const html of [render("current"), render("independent"), render("independent", null, 0), render("independent", 518, 600), render("current", null, null)]) {
+      expect(html).toMatch(/Independent VQS Word Bank[\s\S]*<\/label><a class="btn btn--small bankhost__manage" href="\/wordbank">Manage Word Bank<\/a>/);
+      expect(html.match(/href="\/wordbank"/g)).toHaveLength(1);
+      expect(html).not.toContain("target=");
+    }
+  });
+  it("no redundant or outdated Word Bank navigation remains", () => {
+    const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
+    const welcome = read("../../components/Welcome.tsx");
+    expect(welcome).not.toContain("/wordbank");
+    expect(read("../../components/class/IndependentBankPicker.tsx")).not.toContain("/wordbank");
+    for (const src of [welcome, read("../../components/wordbank/WordBankManager.tsx")]) expect(src).not.toMatch(/do not use it yet/i);
+  });
   it("the start page starts on the default and shows the independent bank only when chosen", () => {
     const src = readFileSync(new URL("../../components/class/BankHost.tsx", import.meta.url), "utf8");
     expect(src).toContain("useState<BankSource>(DEFAULT_BANK_SOURCE)");

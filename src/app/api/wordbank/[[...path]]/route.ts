@@ -5,7 +5,7 @@ import type { TeacherEnv } from "@/lib/teacher/auth";
 
 export const dynamic = "force-dynamic";
 
-/** Teacher-only word bank API (independent bank, Phase 2). Not used by gameplay, and no teacher screen calls it yet. */
+/** Teacher-only word bank API (independent bank). Used by the Word Bank screen and, read-only (approved words), when a teacher starts a Pair Game from it. */
 const deps = (): WordbankDeps => ({
   env: process.env as TeacherEnv,
   authKv: () => kvFromEnv(process.env as never),

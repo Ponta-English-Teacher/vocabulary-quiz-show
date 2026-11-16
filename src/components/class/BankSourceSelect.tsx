@@ -22,6 +22,8 @@ export function BankSourceSelect({ source, currentCount, independentCount, onCha
         <input type="radio" name="bank-source" checked={source === "independent"} onChange={() => onChange("independent")} />
         <span><b>Independent VQS Word Bank</b><span className="note">{independentCount !== null && source === "independent" ? `Approved words stored on the server (${independentCount} approved)` : "Approved words stored on the server"}</span></span>
       </label>
+      {/* Always shown (either bank selected, any number of words): the one way into Word Bank management from this page. Same tab. */}
+      <a className="btn btn--small bankhost__manage" href="/wordbank">Manage Word Bank</a>
     </fieldset>
   );
 }

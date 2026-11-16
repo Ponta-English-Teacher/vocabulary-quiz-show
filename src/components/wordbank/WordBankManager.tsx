@@ -130,7 +130,7 @@ export function WordBankManager() {
     <div className="wb">
       <header className="wb__header">
         <h1 className="wb__h1">Word Bank</h1>
-        <p className="note">The independent Vocabulary Quiz Show bank. Games do not use it yet — they still use the saved browser bank. <a href="/">Back to the start page</a></p>
+        <p className="note">The independent Vocabulary Quiz Show bank. Approved words can be played: on the start page, choose “Independent VQS Word Bank” under Which bank? <a href="/">Back to the start page</a></p>
         <ol className="wb__steps" aria-label="Workflow">
           {steps.map((s, i) => (
             <li key={s.step} className="wb__step">
